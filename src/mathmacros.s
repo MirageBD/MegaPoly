@@ -35,9 +35,9 @@
 .define m32 $ac
 .define m33 $b0
 
-.define fx $f0
-.define fy $f4
-.define fz $f8
+.define fx $d0
+.define fy $d4
+.define fz $d8
 
 .macro MATH_ADD from, with, to
 .scope

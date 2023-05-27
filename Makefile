@@ -50,7 +50,7 @@ OBJS = $(EXE_DIR)/boot.o $(EXE_DIR)/main.o
 
 $(BIN_DIR)/bmp_charset.bin: $(BIN_DIR)/bitmap.bin
 	$(MC)
-	$(MC) $< cm1:1 d1:3 cl1:20000 rc1:0
+	$(MC) $< cm1:1 d1:3 cl1:10000 rc1:0
 
 $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/main.s \
@@ -58,6 +58,7 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/macros.s \
 					$(SRC_DIR)/mathmacros.s \
 					$(SRC_DIR)/model.s \
+					$(SRC_DIR)/modplay.s \
 					Makefile Linkfile
 	$(AS) $(ASFLAGS) -o $@ $<
 
@@ -74,6 +75,7 @@ $(EXE_DIR)/megapoly.d81: $(EXE_DIR)/boot.prg $(BIN_DIR)/bmp_charset.bin
 	 -f "boot" -w $(EXE_DIR)/bootaddr.prg \
 	 -f "00" -w $(BIN_DIR)/bitmap_chars0.bin \
 	 -f "01" -w $(BIN_DIR)/bitmap_pal0.bin \
+	 -f "02" -w $(BIN_DIR)/song.mod \
 	$@
 
 # -----------------------------------------------------------------------------
