@@ -50,7 +50,7 @@ OBJS = $(EXE_DIR)/boot.o $(EXE_DIR)/main.o
 
 $(BIN_DIR)/bmp_charset.bin: $(BIN_DIR)/bitmap.bin
 	$(MC)
-	$(MC) $< cm1:1 d1:3 cl1:20000 b1:$(BIN_DIR)/bmp_charset.bin b2:$(BIN_DIR)/bmp_screen.bin p1:$(BIN_DIR)/bmp_pal.bin
+	$(MC) $< cm1:1 d1:3 cl1:20000 rc1:0
 
 $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/main.s \
@@ -72,8 +72,8 @@ $(EXE_DIR)/megapoly.d81: $(EXE_DIR)/boot.prg $(BIN_DIR)/bmp_charset.bin
 	$(CC1541) -n "megapoly" -i " 2023" -d 19 -v\
 	 \
 	 -f "boot" -w $(EXE_DIR)/bootaddr.prg \
-	 -f "00" -w $(BIN_DIR)/bmp_charset.bin \
-	 -f "01" -w $(BIN_DIR)/bmp_pal.bin \
+	 -f "00" -w $(BIN_DIR)/bitmap_chars0.bin \
+	 -f "01" -w $(BIN_DIR)/bitmap_pal0.bin \
 	$@
 
 # -----------------------------------------------------------------------------
