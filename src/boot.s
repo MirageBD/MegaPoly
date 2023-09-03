@@ -27,6 +27,7 @@ basicend	.byte 0
 
 .include "main.s"
 .include "irqload.s"
+.include "decruncher.s"
 .include "modplay.s"
 
 ; ----------------------------------------------------------------------------------------------------

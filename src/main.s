@@ -9,7 +9,7 @@
 .define screenchars1	$20000
 .define screenchars2	$30000
 
-.define moddata			$50000
+.define moddata			$40000
 
 .define x1				$90								; overwrites rotation matrix in ZP/BP, but we're done with that anyway
 .define y1				$94
@@ -152,9 +152,10 @@ entry_main
 
 		jsr fl_init
 		jsr fl_waiting
-		FLOPPY_FAST_LOAD bmpchars,			$30, $30
-		FLOPPY_FAST_LOAD palette,			$30, $31
-		FLOPPY_FAST_LOAD moddata,			$30, $32
+		FLOPPY_IFFL_FAST_LOAD_INIT "MEGAPLY.IFFLCRCH"
+		FLOPPY_IFFL_FAST_LOAD
+		FLOPPY_IFFL_FAST_LOAD
+		FLOPPY_IFFL_FAST_LOAD
 		jsr fl_exit
 
 		sei

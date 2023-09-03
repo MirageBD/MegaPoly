@@ -1,3 +1,8 @@
+; 0. fastload_request = 1 (fl_new_request)
+; 1. fastload_request = 2 (fl_directory_scan)
+; 2. fastload_request = 3 (fl_read_file_block)
+; 3. jump to 2
+
 ; ----------------------------------------------------------------------------------------------------
 
 ; D080        IRQ     LED     MOTOR   SWAP    SIDE    DS      DS      DS      
@@ -153,31 +158,14 @@ fastload_irq_handler
 		tya
 		pha
 
-		;jsr fastload_irq
+		inc $d020
+		inc $d021
 
-		ldx #$00
-:		lda fastload_sector_buffer,x
-		ldy #$00
-:		dey
-		bne :-
-		sta $d021
-		sta $d020
-		dex
-		bne :--
+		lda $d012
+		adc #$20
+		sta $d012
 
-		ldx #$00
-:		lda fastload_sector_buffer+$0100,x
-		ldy #$00
-:		dey
-		bne :-
-		sta $d021
-		sta $d020
-		dex
-		bne :--
-
-		lda #$00
-		sta $d020
-		sta $d021
+		; nop
 
 		pla
 		tay
@@ -203,20 +191,28 @@ fastload_filename_len
 fastload_address
 		.byte 0, 0, 0, 0
 
+fastload_iffl_counter
+		.byte 0, 0, 0, 0
+
 fastload_request
-		;.byte 4										; Start with seeking to track 0
-		.byte 6											; Start by getting dir entries
+		.byte 4											; Start with seeking to track 0
 
 		; $00 = fl_idle									; idle
 		; $01 = fl_new_request							; requested
-		; $02 = fl_directory_scan						; acknowledged
-		; $03 = fl_read_file_block						; advance to next state
+		; $02 = fl_directory_scan						; scan directory
+		; $03 = fl_read_file_block						; read file block
 		; $04 = fl_seek_track_0							; seek to track 0
 		; $05 = fl_reading_sector						; track stepping/sector reading state
+		; $06 = fl_iffl_read_file_block_init
+		; $07 = fl_iffl_read_file_block
 		; $80 = File not found							; file not found
 
 fastload_request_stashed								; Remember the state that requested a sector read
 		.byte 0
+
+		; Variables for the logical track and sector of the next 256 byte block of the file.
+		; These have to get translated into the physical track and sector of the drive, which like the 1581,
+		; stores two blocks in each physical sector.
 
 fl_current_track
 		.byte 0
@@ -238,33 +234,45 @@ fastload_sector_buffer
 		.byte 0
 .endrepeat
 
+fastload_iffl_start_address_and_size
 fastload_directory_entries
 .repeat 256
 		.byte 0
 .endrepeat
 
-fastload_irq
-		lda fastload_request							; If the FDC is busy, do nothing, as we can't progress.
-		bne todo										; This really simplifies the state machine into a series of sector reads
-		rts
+fl_iffl_numfiles
+		.byte 0
 
-todo	lda $d082
-		bpl fl_fdc_not_busy								; wait for the BUSY flag (bit 7 of $D082)
-		rts
+fl_iffl_currentfile
+		.byte 0
+
+fl_iffl_sizeremaining
+		.byte 0, 0, 0, 0
+
+fl_iffl_bytecounter
+		.byte 0
+
+fastload_irq
+		lda fastload_request							; are we in idle state?
+		bne todo										; nope, go and check if the FDC is busy
+		rts												; yep, back out
+
+todo	lda $d082										; is the FDC busy?
+		bpl fl_fdc_not_busy								; nope, continue with request
+		rts												; yep, back out
 
 fl_fdc_not_busy
-		lda fastload_request							; FDC is not busy, so check what state we are in
-		bpl fl_not_in_error_state
-
-		rts
+		lda fastload_request							; are we in error state?
+		bpl fl_not_in_error_state						; nope, continue
+		rts												; yep, back out
 
 fl_not_in_error_state
-		cmp #8
-		bcc fl_job_ok
-		rts												; Ignore request/status codes that don't correspond to actions
+		cmp #8											; is the request smaller than 8?
+		bcc fl_job_ok									; yep, continue
+		rts												; nope, something must have gone wrong ($80 (file not found) is bigger than 8)
 
 fl_job_ok
-		asl												; Shift state left one bit, so that we can use it as a lookup
+		asl												; shift state left one bit, so that we can use it as a lookup
 		tax												; into a jump table. Everything else is handled by the jump table
 		jmp (fl_jumptable,x)
 
@@ -275,8 +283,8 @@ fl_jumptable
 		.word fl_read_file_block						; 3
 		.word fl_seek_track_0							; 4
 		.word fl_reading_sector							; 5
-		.word fl_new_dir_request						; 6
-		.word fl_collect_dir_entries					; 7
+		.word fl_iffl_read_file_block_init				; 6
+		.word fl_iffl_read_file_block					; 7
 
 fl_idle
 		rts
@@ -335,148 +343,6 @@ fl_read_dir_for_ui
 		
 ; ------------------------------------------------------------------------------------------------------------------------------
 
-fl_new_dir_request
-		lda #7											; Acknowledge fastload request
-		sta fastload_request
-
-		lda #40-1										; Request Track 40 Sector 3 to start directory scan
-		sta $d084										; (remember we have to do silly translation to real sectors)
-		lda #(3/2)+1
-		sta $d085
-		jsr fl_select_side0
-
-		lda #<fastload_sector_buffer
-		sta fl_cde_buffaddr1+1
-		sta fl_cde_buffaddr2+1
-		sta fl_cde_buffaddr3+1
-		sta fl_cde_buffaddr4+1
-		clc
-		lda #>fastload_sector_buffer
-		adc #$01										; start in second half
-		sta fl_cde_buffaddr1+2
-		sta fl_cde_buffaddr2+2
-		sta fl_cde_buffaddr3+2
-		sta fl_cde_buffaddr4+2
-
-		lda #$00
-		sta fl_cde_idx
-
-		jsr fl_read_sector								; Request read
-		rts
-
-; ------------------------------------------------------------------------------------------------------------------------------
-
-fl_char0
-		.byte $00
-fl_char1
-		.byte $00
-
-fl_find_dir_entry
-
-		stx fl_char0
-		sty fl_char1
-
-		ldy #$02
-fl_fde_loop
-		lda fastload_directory_entries+0,y
-		cmp fl_char0
-		bne next_entry
-		lda fastload_directory_entries+1,y
-		cmp fl_char1
-		bne next_entry
-		tya
-		sec
-		sbc #$02
-		tax
-		ldy fastload_directory_entries+0,x
-		lda fastload_directory_entries+1,x
-		jmp fl_got_file_track_and_sector
-
-next_entry
-		iny
-		iny
-		iny
-		iny
-		jmp fl_fde_loop
-
-; ------------------------------------------------------------------------------------------------------------------------------
-
-fl_cde_idx
-		.byte $00
-
-fl_collect_dir_entries
-		jsr fl_copy_sector_to_buffer
-
-		ldy fl_cde_idx
-fl_cde_loop
-		ldx #$03
-
-fl_cde_buffaddr1
-		lda fastload_sector_buffer+$0100,x				; track
-		sta fastload_directory_entries,y
-		inx
-		iny
-fl_cde_buffaddr2
-		lda fastload_sector_buffer+$0100,x				; sector
-		sta fastload_directory_entries,y
-		inx
-		iny
-fl_cde_buffaddr3
-		lda fastload_sector_buffer+$0100,x				; first char
-		sta fastload_directory_entries,y
-		inx
-		iny
-fl_cde_buffaddr4
-		lda fastload_sector_buffer+$0100,x				; second char
-		sta fastload_directory_entries,y
-		inx
-		iny
-		txa												; Advance to next directory entry
-		clc
-		adc #$20-4
-		tax
-		bcc fl_cde_buffaddr1
-
-		sty fl_cde_idx
-		inc fl_cde_buffaddr1+2
-		inc fl_cde_buffaddr2+2
-		inc fl_cde_buffaddr3+2
-		inc fl_cde_buffaddr4+2
-		lda fl_cde_buffaddr1+2
-		cmp #(>fastload_sector_buffer)+1
-		bne fl_cde_checked_both_halves
-		jmp fl_cde_loop
-
-fl_cde_checked_both_halves
-		inc $d085										; No matching name in this 512 byte sector.
-		lda $d085										; Load the next one, or give up the search
-
-		cmp #6											; COMPARE 6 TRACKS. INCREASE IF WE RUN OUT OF SPACE!!!
-
-		beq fl_stop_collect_dir_entries
-
-		lda #<fastload_sector_buffer
-		sta fl_cde_buffaddr1+1
-		sta fl_cde_buffaddr2+1
-		sta fl_cde_buffaddr3+1
-		sta fl_cde_buffaddr4+1
-		lda #>fastload_sector_buffer
-		sta fl_cde_buffaddr1+2
-		sta fl_cde_buffaddr2+2
-		sta fl_cde_buffaddr3+2
-		sta fl_cde_buffaddr4+2
-
-		jsr fl_read_sector								; Request read. No need to change state
-		rts
-
-fl_stop_collect_dir_entries
-		lda #$00
-		sta fastload_request
-
-		rts
-
-; ------------------------------------------------------------------------------------------------------------------------------
-
 fl_directory_scan
 
 		jsr fl_copy_sector_to_buffer					; Check if our filename we want is in this sector
@@ -507,6 +373,7 @@ fl_buffaddr
 		bne fl_check_loop_inner
 
 fl_found_file											; Filename matches
+
 		txa
 		sec
 		sbc #$12
@@ -530,10 +397,11 @@ fl_got_file_track_and_sector
 		sty fl_file_next_track							; Store track and sector of file
 		sta fl_file_next_sector
 
-		lda #3											; Advance to next state
+		lda #6											; Advance to next state (6=fl_iffl_read_file_block_init)
 		sta fastload_request
 
 		jsr fl_read_next_sector							; Request reading of next track and sector
+
 		rts
 
 fl_filename_differs
@@ -564,15 +432,13 @@ fl_checked_both_halves
 
 		lda #$80 										; Mark load as failed. $80 = File not found
 		sta fastload_request
-
-:		inc $d020
-		jmp :-
-
 		rts
 
 fl_load_next_dir_sector
 		jsr fl_read_sector								; Request read. No need to change state
 		rts
+
+; ------------------------------------------------------------------------------------------------------------------------------
 
 fl_read_sector
 
@@ -582,6 +448,9 @@ fl_read_sector
 		lda #5											; and then set ourselves to the track stepping/sector reading state
 		sta fastload_request
 														; FALLTHROUGH
+
+		; ----------------------------------------------------------------------------------------------------------------------
+
 fl_reading_sector
 		lda $d084										; Check if we are already on the correct track/side
 		cmp fl_current_track							; and if not, select/step as required
@@ -616,7 +485,7 @@ fl_on_correct_track
 		jmp fl_fdc_not_busy
 
 fl_not_prev_sector
-		lda #$40
+		lda #$40										; ISSUE ACTUAL READ COMMAND
 		sta $d081
 
 		lda fastload_request_stashed					; Now that we are finally reading the sector,
@@ -625,7 +494,7 @@ fl_not_prev_sector
 		rts
 
 fl_step_track
-		lda #3											; advance to next state
+		lda #3											; advance to next state (3=fl_read_file_block)
 		sta fastload_request
 														; FALL THROUGH
 
@@ -668,37 +537,306 @@ fl_on_second_side
 		jsr fl_select_side1
 		rts
 
+; ------------------------------------------------------------------------------------------------------------------------------
+
+fl_iffl_read_file_block_init
+
+		lda #$07										; Set state to fl_iffl_read_file_block
+		sta fastload_request
+
+		jsr fl_copy_sector_to_buffer					; Get sector from FDC
+
+		lda fl_file_next_sector							; Work out which half we care about
+		and #$01
+		bne fl_iffl_init_read_from_second_half			; odd next sector number, so second half
+
+		lda fastload_sector_buffer+2					; read number of file entries in iffl from first sector
+		sta fl_iffl_numfiles
+
+		ldx #$00
+
+		ldy #$00
+:		lda fastload_sector_buffer+$003,x					; get start addresses for files in iffl
+		sta fastload_iffl_start_address_and_size+0,x
+		lda fastload_sector_buffer+$004,x
+		sta fastload_iffl_start_address_and_size+1,x
+		lda fastload_sector_buffer+$005,x
+		sta fastload_iffl_start_address_and_size+2,x
+		lda fastload_sector_buffer+$006,x
+		sta fastload_iffl_start_address_and_size+3,x
+		lda fastload_sector_buffer+$007,x					; get sizes for files in iffl
+		sta fastload_iffl_start_address_and_size+4,x
+		lda fastload_sector_buffer+$008,x
+		sta fastload_iffl_start_address_and_size+5,x
+		lda fastload_sector_buffer+$009,x
+		sta fastload_iffl_start_address_and_size+6,x
+		lda fastload_sector_buffer+$00a,x
+		sta fastload_iffl_start_address_and_size+7,x
+		clc
+		txa
+		adc #$08
+		tax
+		iny
+		cpy fl_iffl_numfiles
+		bne :-
+
+		jmp fl_iffl_read_file_block_init_end
+
+fl_iffl_init_read_from_second_half
+		lda fastload_sector_buffer+$102					; read number of file entries in iffl from second sector
+		sta fl_iffl_numfiles
+
+		ldx #$00
+
+		ldy #$00
+:		lda fastload_sector_buffer+$103,x				; get start addresses for files in iffl
+		sta fastload_iffl_start_address_and_size+0,x
+		lda fastload_sector_buffer+$104,x
+		sta fastload_iffl_start_address_and_size+1,x
+		lda fastload_sector_buffer+$105,x
+		sta fastload_iffl_start_address_and_size+2,x
+		lda fastload_sector_buffer+$106,x
+		sta fastload_iffl_start_address_and_size+3,x
+		lda fastload_sector_buffer+$107,x				; get sizes for files in iffl
+		sta fastload_iffl_start_address_and_size+4,x
+		lda fastload_sector_buffer+$108,x
+		sta fastload_iffl_start_address_and_size+5,x
+		lda fastload_sector_buffer+$109,x
+		sta fastload_iffl_start_address_and_size+6,x
+		lda fastload_sector_buffer+$10a,x
+		sta fastload_iffl_start_address_and_size+7,x
+		clc
+		txa
+		adc #$08
+		tax
+		iny
+		cpy fl_iffl_numfiles
+		bne :-
+
+		jmp fl_iffl_read_file_block_init_end
+
+fl_iffl_read_file_block_init_end
+
+		clc												; set iffl byte counter to 1(nexttrack)+1(nextsector)+1(numfiles)+numfiles*8
+		lda fl_iffl_numfiles
+		asl
+		asl
+		asl
+		adc #$03
+		sta fl_iffl_bytecounter
+
+		ldx #$00
+		stx fl_iffl_currentfile
+
+		lda fastload_iffl_start_address_and_size+0
+		sta fastload_address+0
+		lda fastload_iffl_start_address_and_size+1
+		sta fastload_address+1
+		lda fastload_iffl_start_address_and_size+2
+		sta fastload_address+2
+		lda fastload_iffl_start_address_and_size+3
+		sta fastload_address+3
+		lda fastload_iffl_start_address_and_size+4
+		sta fl_iffl_sizeremaining+0
+		lda fastload_iffl_start_address_and_size+5
+		sta fl_iffl_sizeremaining+1
+		lda fastload_iffl_start_address_and_size+6
+		sta fl_iffl_sizeremaining+2
+		lda fastload_iffl_start_address_and_size+7
+		sta fl_iffl_sizeremaining+3
+
+		lda #$00										; Mark end of loading
+		sta fastload_request
+
+		rts
+
+; ------------------------------------------------------------------------------------------------------------------------------
+
+fl_iffl_read_file_block
+
+		jsr fl_copy_sector_to_buffer					; Get sector from FDC
+
+		lda fl_iffl_sizeremaining+3
+		bne fl_iffl_fullcopy
+		lda fl_iffl_sizeremaining+2
+		bne fl_iffl_fullcopy
+		lda fl_iffl_sizeremaining+1
+		bne fl_iffl_fullcopy
+		sec
+		lda #0											; (256 - counter) > sizeremaining?
+		sbc fl_iffl_bytecounter
+		sec
+		sbc fl_iffl_sizeremaining+0
+		bcc fl_iffl_fullcopy							; yes, copy remaining buffer
+
+fl_iffl_partialcopy										; no, copy until remaining size
+
+		lda fl_file_next_sector							; Work out which half we care about
+		and #$01
+		bne fl_iffl_partial_read_from_second_half		; odd next sector number, so second half
+		lda #(>fastload_sector_buffer)+0
+		sta fl_read_page+1
+		bra fl_iffl_dopartialcopy
+fl_iffl_partial_read_from_second_half
+		lda #(>fastload_sector_buffer)+1
+		sta fl_read_page+1
+
+fl_iffl_dopartialcopy
+
+		lda fl_iffl_bytecounter							; set offset for DMA copy
+		sta fl_read_page+0
+
+		lda fl_iffl_sizeremaining+0
+		sta fl_bytes_to_copy
+
+		clc
+		lda fl_iffl_bytecounter
+		adc fl_bytes_to_copy
+		sta fl_iffl_bytecounter
+
+		lda #$00										; Mark end of loading
+		sta fastload_request
+		jsr fl_iffl_performcopy
+
+		rts
+
+fl_iffl_fullcopy
+
+		lda fl_file_next_sector							; Work out which half we care about
+		and #$01
+		bne fl_iffl_read_from_second_half				; odd next sector number, so second half
+
+		lda #(>fastload_sector_buffer)+0				; fl_read_from_first_half
+		sta fl_read_page+1
+		lda fastload_sector_buffer+1
+		sta fl_file_next_sector
+		lda fastload_sector_buffer+0
+		sta fl_file_next_track
+		jmp fl_iffl_dma_read_bytes
+
+fl_iffl_read_from_second_half
+		lda #(>fastload_sector_buffer)+1
+		sta fl_read_page+1
+		lda fastload_sector_buffer+$101
+		sta fl_file_next_sector
+		lda fastload_sector_buffer+$100
+		sta fl_file_next_track
+		jmp fl_iffl_dma_read_bytes
+
+fl_iffl_dma_read_bytes
+
+		sec
+		lda #0
+		sbc fl_iffl_bytecounter
+		sta fl_bytes_to_copy
+		sec
+		lda fl_iffl_sizeremaining+0
+		sbc fl_bytes_to_copy
+		sta fl_iffl_sizeremaining+0
+		lda fl_iffl_sizeremaining+1
+		sbc #0
+		sta fl_iffl_sizeremaining+1
+		lda fl_iffl_sizeremaining+2
+		sbc #0
+		sta fl_iffl_sizeremaining+2
+		lda fl_iffl_sizeremaining+3
+		sbc #0
+		sta fl_iffl_sizeremaining+3
+
+		lda fl_iffl_bytecounter							; set offset for DMA copy
+		sta fl_read_page+0
+		jsr fl_iffl_performcopy
+
+		clc
+		lda fl_iffl_bytecounter
+		adc fl_bytes_to_copy
+		sta fl_iffl_bytecounter
+		clc
+		lda fl_iffl_bytecounter
+		adc #$02
+		sta fl_iffl_bytecounter
+
+		jsr fl_read_next_sector							; Schedule reading of next block
+
+		rts
+
+fl_iffl_performcopy
+
+		lda fastload_address+3							; Update destination address
+		asl
+		asl
+		asl
+		asl
+		sta fl_data_read_dmalist+2						; update destination MB
+		lda fastload_address+2
+		lsr
+		lsr
+		lsr
+		lsr
+		ora fl_data_read_dmalist+2
+		sta fl_data_read_dmalist+2						; update destination MB
+		lda fastload_address+2
+		and #$0f
+		sta fl_data_read_dmalist+12						; update Dest bank
+		lda fastload_address+1
+		sta fl_data_read_dmalist+11						; update Dest Address high
+		lda fastload_address+0
+		sta fl_data_read_dmalist+10						; update Dest Address low
+
+		lda #$00										; Copy sector buffer data to final address
+		sta $d704
+		lda #>fl_data_read_dmalist
+		sta $d701
+		lda #<fl_data_read_dmalist
+		sta $d705
+
+		clc
+		lda fastload_address+0							; Update load address
+		adc fl_bytes_to_copy
+		sta fastload_address+0
+		lda fastload_address+1
+		adc #0
+		sta fastload_address+1
+		lda fastload_address+2
+		adc #0
+		sta fastload_address+2
+		lda fastload_address+3
+		adc #0
+		sta fastload_address+3
+
+		rts
+
+; ------------------------------------------------------------------------------------------------------------------------------
+
 fl_read_file_block
 														; We have a sector from the floppy drive.
 														; Work out which half and how many bytes, and copy them into place.
 
 		jsr fl_copy_sector_to_buffer					; Get sector from FDC
 
-		lda #254										; Assume full sector initially
+		sec
+		lda #$00										; Assume full sector initially (256 bytes)
+		sbc #$02										; subtract 2 for track and sector bytes
 		sta fl_bytes_to_copy
 
 		lda fl_file_next_sector							; Work out which half we care about
 		and #$01
+		bne fl_read_from_second_half					; odd next sector number, so second half
 
-		bne fl_read_from_second_half
-
-fl_read_from_first_half
-		lda #(>fastload_sector_buffer)+0
+		lda #(>fastload_sector_buffer)+0				; fl_read_from_first_half
 		sta fl_read_page+1
 		lda fastload_sector_buffer+1
 		sta fl_file_next_sector
 		lda fastload_sector_buffer+0
 		sta fl_file_next_track
-		bne fl_1st_half_full_sector
+		bne fl_dma_read_bytes							; if next track is 0 then this is a partial sector and 'sector' now becomes the number of bytes left in this sector
 
-fl_1st_half_partial_sector
-		lda fastload_sector_buffer+1
+		lda fastload_sector_buffer+1					; fl_1st_half_partial_sector. track is 0, so sector contains number of bytes left
+		sec												; subtract 1, because the byte that contains the size is included
+		sbc #$01
 		sta fl_bytes_to_copy	
-
 		lda #$00										; Mark end of loading
 		sta fastload_request
-
-fl_1st_half_full_sector
 		jmp fl_dma_read_bytes
 
 fl_read_from_second_half
@@ -708,17 +846,17 @@ fl_read_from_second_half
 		sta fl_file_next_sector
 		lda fastload_sector_buffer+$100
 		sta fl_file_next_track
-		bne fl_2nd_half_full_sector
+		bne fl_dma_read_bytes							; if next track is 0 then this is a partial sector and 'sector' now becomes the number of bytes left in this sector
 
-fl_2nd_half_partial_sector
-		lda fastload_sector_buffer+$101
+		lda fastload_sector_buffer+$101					; fl_2nd_half_partial_sector. track is 0, so sector contains number of bytes left
+		sec												; subtract 1, because the byte that contains the size is included
+		sbc #$01
 		sta fl_bytes_to_copy
-
 		lda #$00										; Mark end of loading
 		sta fastload_request
+		jmp fl_dma_read_bytes
 
-fl_2nd_half_full_sector
-														; FALLTHROUGH
+; ------------------------------------------------------------------------------------------------------------------------------
 
 fl_dma_read_bytes
 		lda fastload_address+3							; Update destination address
@@ -726,23 +864,23 @@ fl_dma_read_bytes
 		asl
 		asl
 		asl
-		sta fl_data_read_dmalist+2
+		sta fl_data_read_dmalist+2						; update destination MB
 		lda fastload_address+2
 		lsr
 		lsr
 		lsr
 		lsr
 		ora fl_data_read_dmalist+2
-		sta fl_data_read_dmalist+2
+		sta fl_data_read_dmalist+2						; update destination MB
 		lda fastload_address+2
 		and #$0f
-		sta fl_data_read_dmalist+12
+		sta fl_data_read_dmalist+12						; update Dest bank
 		lda fastload_address+1
-		sta fl_data_read_dmalist+11
+		sta fl_data_read_dmalist+11						; update Dest Address high
 		lda fastload_address+0
-		sta fl_data_read_dmalist+10
+		sta fl_data_read_dmalist+10						; update Dest Address low
 
-		lda #$00										; Copy FDC data to our buffer
+		lda #$00										; Copy sector buffer data to final address
 		sta $d704
 		lda #>fl_data_read_dmalist
 		sta $d701
@@ -767,6 +905,8 @@ fl_dma_read_bytes
 
 		rts
 
+; ------------------------------------------------------------------------------------------------------------------------------
+
 fl_data_read_dmalist
 		.byte $0b										; F011A type list
 		.byte $81,$00									; Destination MB
@@ -782,6 +922,8 @@ fl_read_page
 		.byte $00										; sub-command
 		.word 0											; modulo (unused)
 		rts
+
+; ------------------------------------------------------------------------------------------------------------------------------
 
 fl_copy_sector_to_buffer
 		lda #$80										; Make sure FDC sector buffer is selected
@@ -806,3 +948,5 @@ fl_sector_read_dmalist
 		.byte $00										; Dest bank
 		.byte $00										; sub-command
 		.word 0											; modulo (unused)
+
+; ------------------------------------------------------------------------------------------------------------------------------
