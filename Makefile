@@ -51,7 +51,7 @@ default: all
 
 OBJS = $(EXE_DIR)/boot.o $(EXE_DIR)/main.o
 
-BI5NFILES = $(BIN_DIR)/bitmap_chars0.bin
+BINFILES = $(BIN_DIR)/bitmap_chars0.bin
 BINFILES += $(BIN_DIR)/bitmap_pal0.bin
 BINFILES += $(BIN_DIR)/song.mod
 
