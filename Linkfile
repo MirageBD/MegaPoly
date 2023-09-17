@@ -1,11 +1,10 @@
 MEMORY
 {
-	RAM:		start=$2001, size=$d800;
+	RAM:			start=$2100, size=$d800;
 }
 
 SEGMENTS
 {
-	BASIC:			load=RAM, start=$2001;
-	MAIN:			load=RAM, align=256;
+	MAIN:			load=RAM, start=$2100;
 	TABLES:         load=RAM, align=256;
 }

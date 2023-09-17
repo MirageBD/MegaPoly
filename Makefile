@@ -1,8 +1,6 @@
 # -----------------------------------------------------------------------------
 
 megabuild		= 1
-useetherload	= 1
-finalbuild		= 1
 attachdebugger	= 0
 
 # -----------------------------------------------------------------------------
@@ -22,7 +20,7 @@ BIN_DIR			= ./bin
 
 # mega65 fork of ca65: https://github.com/dillof/cc65
 AS				= ca65mega
-ASFLAGS			= -g -D finalbuild=$(finalbuild) -D megabuild=$(megabuild) -D useetherload=$(useetherload) --cpu 45GS02 -U --feature force_range -I ./exe
+ASFLAGS			= -g -D megabuild=$(megabuild) --cpu 45GS02 -U --feature force_range -I ./exe
 LD				= ld65
 C1541			= c1541
 CC1541			= cc1541
@@ -55,18 +53,9 @@ BINFILES = $(BIN_DIR)/bitmap_chars0.bin
 BINFILES += $(BIN_DIR)/bitmap_pal0.bin
 BINFILES += $(BIN_DIR)/song.mod
 
-BINFILESADDR  = $(BIN_DIR)/bitmap_chars0.bin.addr
-BINFILESADDR += $(BIN_DIR)/bitmap_pal0.bin.addr
-BINFILESADDR += $(BIN_DIR)/song.mod.addr
-
 BINFILESMC  = $(BIN_DIR)/bitmap_chars0.bin.addr.mc
 BINFILESMC += $(BIN_DIR)/bitmap_pal0.bin.addr.mc
 BINFILESMC += $(BIN_DIR)/song.mod.addr.mc
-
-# % is a wildcard
-# $< is the first dependency
-# $@ is the target
-# $^ is all dependencies
 
 # -----------------------------------------------------------------------------
 
@@ -93,17 +82,16 @@ $(BIN_DIR)/alldata.bin: $(BINFILES)
 	$(MEGACRUNCH) $(BIN_DIR)/song.mod.addr
 	$(MEGAIFFL) $(BINFILESMC) $(BIN_DIR)/alldata.bin
 
-$(EXE_DIR)/boot.prg.addr: $(EXE_DIR)/boot.o Linkfile
+$(EXE_DIR)/boot.prg.addr.mc: $(BINFILES) $(EXE_DIR)/boot.o Linkfile
 	$(LD) -Ln $(EXE_DIR)/boot.maptemp --dbgfile $(EXE_DIR)/boot.dbg -C Linkfile -o $(EXE_DIR)/boot.prg $(EXE_DIR)/boot.o
-	$(MEGAADDRESS) $(EXE_DIR)/boot.prg 2001
-	$(SED) $(CONVERTVICEMAP) < $(EXE_DIR)/boot.maptemp > boot.map
-	$(SED) $(CONVERTVICEMAP) < $(EXE_DIR)/boot.maptemp > boot.list
+	$(MEGAADDRESS) $(EXE_DIR)/boot.prg 00002100
+	$(MEGACRUNCH) -e 00002100 $(EXE_DIR)/boot.prg.addr
 
-$(EXE_DIR)/megapoly.d81: $(EXE_DIR)/boot.prg.addr $(BIN_DIR)/alldata.bin
+$(EXE_DIR)/megapoly.d81: $(EXE_DIR)/boot.prg.addr.mc $(BIN_DIR)/alldata.bin
 	$(RM) $@
 	$(CC1541) -n "megapoly" -i " 2023" -d 19 -v\
 	 \
-	 -f "megapoly" -w $(EXE_DIR)/boot.prg.addr \
+	 -f "megapoly" -w $(EXE_DIR)/boot.prg.addr.mc \
 	 -f "megaply.ifflcrch" -w $(BIN_DIR)/alldata.bin \
 	$@
 
@@ -112,39 +100,13 @@ $(EXE_DIR)/megapoly.d81: $(EXE_DIR)/boot.prg.addr $(BIN_DIR)/alldata.bin
 run: $(EXE_DIR)/megapoly.d81
 
 ifeq ($(megabuild), 1)
-
-ifeq ($(useetherload), 1)
-
 	$(MEGAFTP) -c "put D:\Mega\MegaPoly\exe\megapoly.d81 megapoly.d81" -c "quit"
-	$(EL) -m MEGAPOLY.D81 -r $(EXE_DIR)/boot.prg.addr
-
-else
-
-	mega65_ftp.exe -l COM3 -s 2000000 -c "cd /" \
-	-c "put D:\Mega\MegaPoly\exe\megapoly.d81 megapoly.d81"
-
-	m65 -l COM3 -F
-	m65 -l COM3 -T 'list'
-	m65 -l COM3 -T 'list'
-	m65 -l COM3 -T 'list'
-	m65 -l COM3 -T 'mount "megapoly.d81"'
-	m65 -l COM3 -T 'load "$$"'
-	m65 -l COM3 -T 'list'
-	m65 -l COM3 -T 'list'
-	m65 -l COM3 -T 'load "boot"'
-	m65 -l COM3 -T 'list'
-	m65 -l COM3 -T 'run'
-
-endif
-
+	$(EL) -m MEGAPOLY.D81 -r $(EXE_DIR)/boot.prg.addr.mc
 ifeq ($(attachdebugger), 1)
 	m65dbg --device /dev/ttyS2
 endif
-
 else
-
 	cmd.exe /c $(XMEGA65) -autoload -8 $(EXE_DIR)/megapoly.d81
-
 endif
 
 clean:
