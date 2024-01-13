@@ -187,7 +187,7 @@ offsets	.byte %11011111 ; 3								; short offsets
 
 ; -----------------------------------------------------------------------------------------------
 
-decrunch
+decrunch_readstartaddress
 		ldz #$00
 		jsr getnextbyte									; set unpack address
 		sta dc_ldst+0
@@ -198,10 +198,18 @@ decrunch
 		jsr getnextbyte
 		sta dc_ldst+2
 		sta dc_mdst+2
-		jsr getnextbyte
-		;sta dc_ldst+3									; ignore 4th byte (attic ram) for now
-		;sta dc_mdst+3
+		jsr getnextbyte									; set attic byte (megabyte). normally a >>20 shift, so shift left 4 bytes to get to 3*8
+		asl
+		asl
+		asl
+		asl
+		sta dc_lsrcm+1
+		sta dc_msrcm+1
+		sta dc_ldstm+1
+		sta dc_mdstm+1
+		rts
 
+decrunch_dowork
 		clc
 
 		lda #$80
@@ -222,6 +230,8 @@ dloop	jsr getnextbit									; after this, carry is 0, bits = 01010101
 		sta dc_lsrc+2
 
 		sta $d707										; inline DMA copy
+dc_lsrcm	.byte $80, ($00000000 >> 20)					; sourcebank
+dc_ldstm	.byte $81, ($08000000 >> 20)					; destbank
 		.byte $00										; end of job options
 		.byte $00										; copy
 dc_llen	.word $0000										; count
@@ -291,8 +301,10 @@ mdone	;clc
 		sta dc_msrc+2
 		bcs :+
 		dec dc_msrc+2
-:		
+:
 		sta $d707										; inline DMA copy
+dc_msrcm		.byte $80, ($00000000 >> 20)					; sourcebank
+dc_mdstm		.byte $81, ($08000000 >> 20)					; destbank
 		.byte $00										; end of job options
 		.byte $00										; copy
 dc_mlen	.word $0000										; count

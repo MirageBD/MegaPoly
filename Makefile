@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 
-megabuild		= 1
+megabuild		= 0
 attachdebugger	= 0
 
 # -----------------------------------------------------------------------------
@@ -34,9 +34,9 @@ MEGAADDRESS		= megatool -a
 MEGACRUNCH		= megatool -c
 MEGAIFFL		= megatool -i
 MEGAMOD			= MegaMod
-EL				= etherload -i 192.168.1.255
+EL				= etherload
 XMEGA65			= H:\xemu\xmega65.exe
-MEGAFTP			= mega65_ftp -i 192.168.1.255
+MEGAFTP			= mega65_ftp -e
 
 CONVERTBREAK	= 's/al [0-9A-F]* \.br_\([a-z]*\)/\0\nbreak \.br_\1/'
 CONVERTWATCH	= 's/al [0-9A-F]* \.wh_\([a-z]*\)/\0\nwatch store \.wh_\1/'
@@ -66,6 +66,7 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/main.s \
 					$(SRC_DIR)/irqload.s \
 					$(SRC_DIR)/decruncher.s \
+					$(SRC_DIR)/iffl.s \
 					$(SRC_DIR)/macros.s \
 					$(SRC_DIR)/mathmacros.s \
 					$(SRC_DIR)/model.s \
@@ -74,9 +75,9 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 	$(AS) $(ASFLAGS) -o $@ $<
 
 $(BIN_DIR)/alldata.bin: $(BINFILES)
-	$(MEGAADDRESS) $(BIN_DIR)/bitmap_chars0.bin      00010000
-	$(MEGAADDRESS) $(BIN_DIR)/bitmap_pal0.bin        0000c000
-	$(MEGAADDRESS) $(BIN_DIR)/song.mod               00040000
+	$(MEGAADDRESS) $(BIN_DIR)/bitmap_chars0.bin      00000000
+	$(MEGAADDRESS) $(BIN_DIR)/bitmap_pal0.bin        00000000
+	$(MEGAADDRESS) $(BIN_DIR)/song.mod               00000000
 	$(MEGACRUNCH) $(BIN_DIR)/bitmap_chars0.bin.addr
 	$(MEGACRUNCH) $(BIN_DIR)/bitmap_pal0.bin.addr
 	$(MEGACRUNCH) $(BIN_DIR)/song.mod.addr

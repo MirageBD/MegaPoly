@@ -167,7 +167,23 @@ FileName	.byte .sprintf("%s", fname), 0
 			sta fastload_request
 			inc fl_iffl_currentfile
 			jsr fl_waiting
-			jsr decrunch
+			jsr decrunch_readstartaddress
+			jsr decrunch_dowork
+.endscope
+.endmacro
+
+.macro FLOPPY_IFFL_FAST_LOAD_ADDRESS address
+.scope
+			lda #<.loword(address)
+			sta iffl_unpackaddress+0
+			lda #>.loword(address)
+			sta iffl_unpackaddress+1
+			lda #<.hiword(address)
+			sta iffl_unpackaddress+2
+			lda #>.hiword(address)
+			sta iffl_unpackaddress+3
+			
+			jsr iffl_loadanddecrunchnextfile
 .endscope
 .endmacro
 

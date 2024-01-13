@@ -13,6 +13,7 @@ filebuffer = $0200
 .include "main.s"
 .include "irqload.s"
 .include "decruncher.s"
+.include "iffl.s"
 .include "modplay.s"
 
 ; ----------------------------------------------------------------------------------------------------
