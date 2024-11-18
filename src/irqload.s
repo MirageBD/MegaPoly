@@ -814,9 +814,7 @@ fl_read_file_block
 
 		jsr fl_copy_sector_to_buffer					; Get sector from FDC
 
-		sec
-		lda #$00										; Assume full sector initially (256 bytes)
-		sbc #$02										; subtract 2 for track and sector bytes
+		lda #254										; Assume full sector initially (256 bytes)
 		sta fl_bytes_to_copy
 
 		lda fl_file_next_sector							; Work out which half we care about

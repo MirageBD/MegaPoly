@@ -575,6 +575,7 @@ drawleftnoinverseloop
 
 		DRAWLINE
 :
+
 		;clc									; calculate new start y
 		ldq y1
 		adcq leftDelta
@@ -589,6 +590,7 @@ drawleftnoinverseloop
 		ldq x1
 		adcq q1
 		stq x1
+
 		cmpq midX
 		bmi drawleftnoinverseloop
 		jmp drawright
@@ -1109,6 +1111,7 @@ dploop	sta polyindex
 		;sta $d020
 
 		jsr drawpoly
+
 skippolydraw
 
 		clc
@@ -1145,8 +1148,8 @@ skippolydraw
 		DRAW_POINT 7
 */
 
-		;ldx #$00
-		;stx $d020
+		ldx #$00
+		stx $d020
 
 		inc frame
 
