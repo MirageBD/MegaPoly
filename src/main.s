@@ -409,43 +409,6 @@ loop
 		DMA_RUN_JOB_FAST drawlinejob
 .endmacro
 
-.macro SETUP_LINESTART
-		ldx x1+2
-		ldy y1+2
-		lda pixelxlo,x
-		sta linestart+0
-		lda pixelxhi,x
-		sta linestart+1
-		clc
-		lda linestart+0
-		adc pixelylo,y
-		sta linestart+0
-		lda linestart+1
-		adc pixelyhi,y
-		sta linestart+1
-.endmacro
-
-.macro INCREASEX delta1, delta2
-		;clc									; calculate new start y
-		ldq y1
-		adcq delta1
-		stq y1
-		;clc									; calculate new end y
-		ldq y2
-		adcq delta2
-		stq y2
-		;clc									; increase x by 1
-		ldq x1
-		adcq q1
-		stq x1
-.endmacro
-
-.macro CALCULATE_SPAN
-		sec
-		lda y2+2
-		sbc y1+2
-		sta linesize+0
-.endmacro
 
 drawpoly
 		
@@ -527,12 +490,52 @@ drawpoly
 
 
 
+.macro SETUP_START_XY xx, yy
+		ldq xx
+		stq x1
+		ldq yy
+		stq y1
+.endmacro
 
+.macro CALCULATE_SPAN
+		sec
+		lda y2+2
+		sbc y1+2
+		sta linesize+0
+.endmacro
 
+.macro SETUP_LINESTART
+		ldx x1+2
+		ldy y1+2
+		lda pixelxlo,x
+		sta linestart+0
+		lda pixelxhi,x
+		sta linestart+1
+		clc
+		lda linestart+0
+		adc pixelylo,y
+		sta linestart+0
+		lda linestart+1
+		adc pixelyhi,y
+		sta linestart+1
+.endmacro
 
+.macro INCREASEX delta1, delta2
+		;clc											; calculate new start y
+		ldq y1
+		adcq delta1
+		stq y1
+		;clc											; calculate new end y
+		ldq y2
+		adcq delta2
+		stq y2
+		;clc											; increase x by 1
+		ldq x1
+		adcq q1
+		stq x1
+.endmacro
 
-
-		; ----------------------------------------------- DRAW LEFT
+		; ---------------------------------------------- DRAW LEFT
 
 drawleft
 		ldq leftSpanX
@@ -543,11 +546,7 @@ drawleft
 		jmp drawleftinverse
 
 drawleftnoinverse
-		ldq leftX
-		stq x1
-		ldq leftY
-		stq y1
-		stq y2
+		SETUP_START_XY leftX, leftY
 
 drawleftnoinverseloop
 		CALCULATE_SPAN
@@ -559,14 +558,8 @@ drawleftnoinverseloop
 		bmi drawleftnoinverseloop
 		jmp drawright
 
-		; ----------------------------------------------- INVERSE
-
-drawleftinverse
-		ldq leftX
-		stq x1
-		ldq leftY
-		stq y1
-		stq y2
+drawleftinverse ; -------------------------------------- INVERSE
+		SETUP_START_XY leftX, leftY
 
 drawleftinverseloop
 		CALCULATE_SPAN
@@ -578,7 +571,7 @@ drawleftinverseloop
 		bmi drawleftinverseloop
 		jmp drawright
 
-		; ----------------------------------------------- DRAW RIGHT
+		; ---------------------------------------------- DRAW RIGHT
 
 drawright
 		ldq rightSpanX
@@ -589,10 +582,7 @@ drawright
 		jmp drawrightinverse
 
 drawrightnoinverse
-		ldq midX
-		stq x1
-		ldq midY
-		stq y1
+		SETUP_START_XY midX, midY
 
 drawrightnoinverseloop
 		CALCULATE_SPAN
@@ -604,13 +594,11 @@ drawrightnoinverseloop
 		bmi drawrightnoinverseloop
 		rts
 
-		; ----------------------------------------------- INVERSE
-
-drawrightinverse
+drawrightinverse ; ------------------------------------- INVERSE
 		ldq midX
 		stq x1
 		ldq midY
-		stq y2
+		stq y2											; refresh memory - why y2 and not y1?
 
 drawrightinverseloop
 		CALCULATE_SPAN
