@@ -406,27 +406,16 @@ loop
 .endmacro		
 
 .macro DRAWLINE
-.scope
-		;inc linecolour
 		DMA_RUN_JOB_FAST drawlinejob
-
-		;lda #$01
-		;sta linesize+0
-		;lda #$00
-		;sta linesize+1
-
-		;lda #$01
-		;sta linecolour
-
-.endscope	
 .endmacro
 
-drawpixel
+.macro SETUP_LINESTART
+		ldx x1+2
+		ldy y1+2
 		lda pixelxlo,x
 		sta linestart+0
 		lda pixelxhi,x
 		sta linestart+1
-
 		clc
 		lda linestart+0
 		adc pixelylo,y
@@ -434,17 +423,33 @@ drawpixel
 		lda linestart+1
 		adc pixelyhi,y
 		sta linestart+1
+.endmacro
 
-		DRAWLINE
-		rts
+.macro INCREASEX delta1, delta2
+		;clc									; calculate new start y
+		ldq y1
+		adcq delta1
+		stq y1
+		;clc									; calculate new end y
+		ldq y2
+		adcq delta2
+		stq y2
+		;clc									; increase x by 1
+		ldq x1
+		adcq q1
+		stq x1
+.endmacro
+
+.macro CALCULATE_SPAN
+		sec
+		lda y2+2
+		sbc y1+2
+		sta linesize+0
+.endmacro
 
 drawpoly
 		
-		;dec $d020
-
-		;inc $d020
-
-		; swap points if needed
+		; ----------------------------------------------- swap points if needed
 
 		ldq leftX										; swap point A and B if needed
 		cmpq midX
@@ -462,8 +467,7 @@ drawpoly
 		SWAP midX, rightX
 		SWAP midY, rightY
 :
-
-		; calculate X spans
+		; ----------------------------------------------- calculate X spans
 
 		sec
 		ldq midX
@@ -476,11 +480,9 @@ drawpoly
 		sec
 		ldq rightX
 		sbcq leftX
-		stq totalSpanX
+		stq totalSpanX ; return here if total == 0 ?
 
-		; return here if total == 0 ?
-
-		; calculate Y spans
+		; ----------------------------------------------- calculate Y spans
 
 		sec	
 		ldq midY
@@ -495,7 +497,7 @@ drawpoly
 		sbcq leftY
 		stq totalSpanY
 
-		; calculate deltas
+		; ----------------------------------------------- calculate deltas
 
 		MATH_DIV leftSpanY,  leftSpanX,  leftDelta
 		MATH_DIV rightSpanY, rightSpanX, rightDelta
@@ -515,29 +517,32 @@ drawpoly
 :		lda #$01
 		sta inverse
 :
-
-		; set up polygon
+		; ----------------------------------------------- set up polygon
 
 		ldq leftY
 		stq y1
 		stq y2
 
-		;dec $d020
+
+
+
+
+
+
+
+
+
+		; ----------------------------------------------- DRAW LEFT
 
 drawleft
-
-		; don't draw left side if it doesn't exist
-
 		ldq leftSpanX
 		bne :+
-		jmp drawright
-:
-		lda inverse
+		jmp drawright									; don't draw left side if it doesn't exist
+:		lda inverse
 		beq drawleftnoinverse
 		jmp drawleftinverse
 
 drawleftnoinverse
-
 		ldq leftX
 		stq x1
 		ldq leftY
@@ -545,58 +550,18 @@ drawleftnoinverse
 		stq y2
 
 drawleftnoinverseloop
-
-		sec									; calculate span
-		lda y2+2
-		sbc y1+2
-		sta linesize+0
-		;lda y2+3
-		;sbc y1+3
-		;sta linesize+1
-
-		;lda linesize+1
-		;bne :+
-		;lda linesize+0
+		CALCULATE_SPAN
 		beq :+
-
-		ldx x1+2
-		ldy y1+2
-		lda pixelxlo,x
-		sta linestart+0
-		lda pixelxhi,x
-		sta linestart+1
-		clc
-		lda linestart+0
-		adc pixelylo,y
-		sta linestart+0
-		lda linestart+1
-		adc pixelyhi,y
-		sta linestart+1
-
+		SETUP_LINESTART
 		DRAWLINE
-:
-
-		;clc									; calculate new start y
-		ldq y1
-		adcq leftDelta
-		stq y1
-
-		;clc									; calculate new end y
-		ldq y2
-		adcq totalDelta
-		stq y2
-
-		;clc									; increase x by 1
-		ldq x1
-		adcq q1
-		stq x1
-
+:		INCREASEX leftDelta, totalDelta
 		cmpq midX
 		bmi drawleftnoinverseloop
 		jmp drawright
 
-drawleftinverse
+		; ----------------------------------------------- INVERSE
 
+drawleftinverse
 		ldq leftX
 		stq x1
 		ldq leftY
@@ -604,202 +569,66 @@ drawleftinverse
 		stq y2
 
 drawleftinverseloop
-
-		sec									; calculate span
-		lda y2+2
-		sbc y1+2
-		sta linesize+0
-		;lda y2+3
-		;sbc y1+3
-		;sta linesize+1
-
-		;lda linesize+1
-		;bne :+
-		;lda linesize+0
+		CALCULATE_SPAN
 		beq :+
-
-		ldx x1+2
-		ldy y1+2
-		lda pixelxlo,x
-		sta linestart+0
-		lda pixelxhi,x
-		sta linestart+1
-		clc
-		lda linestart+0
-		adc pixelylo,y
-		sta linestart+0
-		lda linestart+1
-		adc pixelyhi,y
-		sta linestart+1
-
+		SETUP_LINESTART
 		DRAWLINE
-:
-		;clc									; calculate new start y
-		ldq y1
-		adcq totalDelta
-		stq y1
-
-		;clc									; calculate new end y
-		ldq y2
-		adcq leftDelta
-		stq y2
-
-		;clc									; increase x by 1
-		ldq x1
-		adcq q1
-		stq x1
+:		INCREASEX totalDelta, leftDelta
 		cmpq midX
 		bmi drawleftinverseloop
 		jmp drawright
 
+		; ----------------------------------------------- DRAW RIGHT
+
 drawright
-
-		; don't draw right side if it doesn't exist
-
 		ldq rightSpanX
 		bne :+
-		jmp enddrawright
-:
-		lda inverse
+		rts												; don't draw right side if it doesn't exist
+:		lda inverse
 		beq drawrightnoinverse
 		jmp drawrightinverse
 
 drawrightnoinverse
-
 		ldq midX
 		stq x1
 		ldq midY
 		stq y1
 
 drawrightnoinverseloop
-
-		sec									; calculate span
-		lda y2+2
-		sbc y1+2
-		sta linesize+0
-		;lda y2+3
-		;sbc y1+3
-		;sta linesize+1
-
-		;lda linesize+1
-		;bne :+
-		;lda linesize+0
+		CALCULATE_SPAN
 		beq :+
-
-		ldx x1+2
-		ldy y1+2
-		lda pixelxlo,x
-		sta linestart+0
-		lda pixelxhi,x
-		sta linestart+1
-		clc
-		lda linestart+0
-		adc pixelylo,y
-		sta linestart+0
-		lda linestart+1
-		adc pixelyhi,y
-		sta linestart+1
-
+		SETUP_LINESTART
 		DRAWLINE
-:
-		;clc									; calculate new start y
-		ldq y1
-		adcq rightDelta
-		stq y1
-
-		;clc									; calculate new end y
-		ldq y2
-		adcq totalDelta
-		stq y2
-
-		;clc									; increase x by 1
-		ldq x1
-		adcq q1
-		stq x1
+:		INCREASEX rightDelta, totalDelta
 		cmpq rightX
 		bmi drawrightnoinverseloop
-		jmp enddrawright
+		rts
+
+		; ----------------------------------------------- INVERSE
 
 drawrightinverse
-
 		ldq midX
 		stq x1
 		ldq midY
 		stq y2
 
 drawrightinverseloop
-
-		sec									; calculate span
-		lda y2+2
-		sbc y1+2
-		sta linesize+0
-		;lda y2+3
-		;sbc y1+3
-		;sta linesize+1
-
-		;lda linesize+1
-		;bne :+
-		;lda linesize+0
+		CALCULATE_SPAN
 		beq :+
-
-		ldx x1+2
-		ldy y1+2
-		lda pixelxlo,x
-		sta linestart+0
-		lda pixelxhi,x
-		sta linestart+1
-		clc
-		lda linestart+0
-		adc pixelylo,y
-		sta linestart+0
-		lda linestart+1
-		adc pixelyhi,y
-		sta linestart+1
-
+		SETUP_LINESTART
 		DRAWLINE
-:
-		;clc									; calculate new start y
-		ldq y1
-		adcq totalDelta
-		stq y1
-
-		;clc									; calculate new end y
-		ldq y2
-		adcq rightDelta
-		stq y2
-
-		;clc									; increase x by 1
-		ldq x1
-		adcq q1
-		stq x1
+:		INCREASEX totalDelta, rightDelta
 		cmpq rightX
 		bmi drawrightinverseloop
-		;jmp enddrawright
-
-enddrawright
-
-		; draw debug pixels
-
-		/*
-		lda #$fe
-		sta linecolour
-		lda #$01
-		sta linesize+0
-		lda #$00
-		sta linesize+1
-
-		ldx leftX+2
-		ldy leftY+2
-		jsr drawpixel
-		ldx midX+2
-		ldy midY+2
-		jsr drawpixel
-		ldx rightX+2
-		ldy rightY+2
-		jsr drawpixel
-		*/
-
 		rts
+
+
+
+
+
+
+
+
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -1122,31 +951,6 @@ skippolydraw
 		jmp dploop
 :
 
-
-/*
-		; get ready to draw points
-		lda #$fe
-		sta linecolour
-		lda #$08
-		sta linesize+0
-		lda #$00
-		sta linesize+1
-
-.macro DRAW_POINT index
-		ldx vertsxconv+(index*4)+2
-		ldy vertsyconv+(index*4)+2
-		jsr drawpixel
-.endmacro
-
-		DRAW_POINT 0
-		DRAW_POINT 1
-		DRAW_POINT 2
-		DRAW_POINT 3
-		DRAW_POINT 4
-		DRAW_POINT 5
-		DRAW_POINT 6
-		DRAW_POINT 7
-*/
 
 		ldx #$00
 		stx $d020
