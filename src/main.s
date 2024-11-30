@@ -2,14 +2,18 @@
 
 .define palette			$c000
 
-.define screen1			$b000
-.define screen2			$e000
+.define screen1			$e000	; 40*25*2 = $0800      ; 80*25*2 = $1000
+.define screen2			$f000
 
-.define bmpchars		$10000
+.define bmpchars		$10000	; 320x200 = $fa00
 .define screenchars1	$20000
 .define screenchars2	$30000
 
 .define moddata			$40000
+
+.define colptr			$90
+.define scrptr1			$94
+.define scrptr2			$98
 
 .define x1				$90								; overwrites rotation matrix in ZP/BP, but we're done with that anyway
 .define y1				$94
@@ -182,7 +186,16 @@ entry_main
 		lda #%10100000									; Clear bit7=40 column, bit5=disable ...?
 		trb $d031
 
-		lda #40*2										; logical chars per row
+		lda #<80										; CHRCOUNT - Number of visual characters to display per row
+		sta $d05e
+		lda #>80
+		asl
+		asl
+		asl
+		asl
+		sta $d063										; ..xx.... high bits of CHRCOUNT
+
+		lda #80*2										; LINESTEPLSB
 		sta $d058
 		lda #$00
 		sta $d059
@@ -191,8 +204,9 @@ entry_main
 		sta $d04c
 
 		DMA_RUN_JOB clearcolorramjob
-		DMA_RUN_JOB copyentirebitmapjob1
-		DMA_RUN_JOB copyentirebitmapjob2
+		DMA_RUN_JOB clearpartialbitmapjob1
+		DMA_RUN_JOB clearpartialbitmapjob2
+		DMA_RUN_JOB cleare000
 
 		; pal y border start
 		lda #<104
@@ -224,12 +238,14 @@ pal		lda verticalcenter+0
 		lda #>.hiword(screen1)
 		sta $d063
 
+		; ----------------------------------------------- SET UP SCREEN 1
+
 		lda #$00
 		sta screenrow
 		sta screencolumn
 
-		ldx #<(screenchars1 / 64)
-		ldy #>(screenchars1 / 64)
+		ldx #<(bmpchars / 64)
+		ldy #>(bmpchars / 64)
 
 put10	stx screen1+0
 put11	sty screen1+1
@@ -244,7 +260,7 @@ put11	sty screen1+1
 
 		clc
 		lda put10+1
-		adc #80
+		adc #160
 		sta put10+1
 		lda put10+2
 		adc #0
@@ -252,7 +268,7 @@ put11	sty screen1+1
 
 		clc
 		lda put11+1
-		adc #80
+		adc #160
 		sta put11+1
 		lda put11+2
 		adc #0
@@ -271,11 +287,12 @@ put11	sty screen1+1
 		cmp #80
 		beq endscreenplot1
 
-		lda #>screen1
+		lda #>(screen1)
 		sta put10+2
 		sta put11+2
 		clc
-		lda screencolumn
+		lda #<(screen1)
+		adc screencolumn
 		sta put10+1
 		adc #$01
 		sta put11+1
@@ -284,12 +301,14 @@ put11	sty screen1+1
 
 endscreenplot1
 
+		; ----------------------------------------------- SET UP SCREEN 2
+
 		lda #$00
 		sta screenrow
 		sta screencolumn
 
-		ldx #<(screenchars2 / 64)
-		ldy #>(screenchars2 / 64)
+		ldx #<(bmpchars / 64)
+		ldy #>(bmpchars / 64)
 
 put20	stx screen2+0
 put21	sty screen2+1
@@ -304,7 +323,7 @@ put21	sty screen2+1
 
 		clc
 		lda put20+1
-		adc #80
+		adc #160
 		sta put20+1
 		lda put20+2
 		adc #0
@@ -312,7 +331,7 @@ put21	sty screen2+1
 
 		clc
 		lda put21+1
-		adc #80
+		adc #160
 		sta put21+1
 		lda put21+2
 		adc #0
@@ -331,11 +350,12 @@ put21	sty screen2+1
 		cmp #80
 		beq endscreenplot2
 
-		lda #>screen2
+		lda #>(screen2)
 		sta put20+2
 		sta put21+2
 		clc
-		lda screencolumn
+		lda #<(screen2)
+		adc screencolumn
 		sta put20+1
 		adc #$01
 		sta put21+1
@@ -343,6 +363,224 @@ put21	sty screen2+1
 		jmp put20
 
 endscreenplot2
+
+		; ----------------------------------------------- SET UP SCREEN 3
+
+		lda #$00
+		sta screenrow
+		sta screencolumn
+
+		ldx #<(screenchars1 / 64)
+		ldy #>(screenchars1 / 64)
+
+put30	stx screen1+40*2+2
+put31	sty screen1+40*2+3
+
+		clc
+		txa
+		adc #$01
+		tax
+		tya
+		adc #$00
+		tay
+
+		clc
+		lda put30+1
+		adc #160
+		sta put30+1
+		lda put30+2
+		adc #0
+		sta put30+2
+
+		clc
+		lda put31+1
+		adc #160
+		sta put31+1
+		lda put31+2
+		adc #0
+		sta put31+2
+
+		inc screenrow
+		lda screenrow
+		cmp #25
+		bne put30
+
+		lda #0
+		sta screenrow
+		inc screencolumn
+		inc screencolumn
+		lda screencolumn
+		cmp #80-2
+		beq endscreenplot3
+
+		lda #>(screen1+40*2+2)
+		sta put30+2
+		sta put31+2
+		clc
+		lda #<(screen1+40*2+2)
+		adc screencolumn
+		sta put30+1
+		adc #$01
+		sta put31+1
+
+		jmp put30
+
+endscreenplot3
+		; ----------------------------------------------- SET UP SCREEN 4
+
+		lda #$00
+		sta screenrow
+		sta screencolumn
+
+		ldx #<(screenchars2 / 64)
+		ldy #>(screenchars2 / 64)
+
+put40	stx screen2+40*2+2
+put41	sty screen2+40*2+3
+
+		clc
+		txa
+		adc #$01
+		tax
+		tya
+		adc #$00
+		tay
+
+		clc
+		lda put40+1
+		adc #160
+		sta put40+1
+		lda put40+2
+		adc #0
+		sta put40+2
+
+		clc
+		lda put41+1
+		adc #160
+		sta put41+1
+		lda put41+2
+		adc #0
+		sta put41+2
+
+		inc screenrow
+		lda screenrow
+		cmp #25
+		bne put40
+
+		lda #0
+		sta screenrow
+		inc screencolumn
+		inc screencolumn
+		lda screencolumn
+		cmp #80-2
+		beq endscreenplot4
+
+		lda #>(screen2+40*2+2)
+		sta put40+2
+		sta put41+2
+		clc
+		lda #<(screen2+40*2+2)
+		adc screencolumn
+		sta put40+1
+		adc #$01
+		sta put41+1
+
+		jmp put40
+
+endscreenplot4
+
+		; ----------------------------------------------- END OF SCREEN SETUP
+
+		; set up scr and col ptrs
+		lda #<.loword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+0
+		lda #>.loword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+1
+		lda #<.hiword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+2
+		lda #>.hiword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+3
+
+		lda #<.loword(screen1+0*160+40*2)
+		sta scrptr1+0
+		lda #>.loword(screen1+0*160+40*2)
+		sta scrptr1+1
+		lda #<.hiword(screen1+0*160+40*2)
+		sta scrptr1+2
+		lda #>.hiword(screen1+0*160+40*2)
+		sta scrptr1+3
+
+		lda #<.loword(screen2+0*160+40*2)
+		sta scrptr2+0
+		lda #>.loword(screen2+0*160+40*2)
+		sta scrptr2+1
+		lda #<.hiword(screen2+0*160+40*2)
+		sta scrptr2+2
+		lda #>.hiword(screen2+0*160+40*2)
+		sta scrptr2+3
+
+		; ----------------------------------------- set up gotox attribs
+
+		ldx #0
+setatrbs
+		ldz #0
+		lda #%10010000 ; gotox and transparency bits set
+		sta [colptr],z
+		lda #<40
+		sta [scrptr1],z
+		sta [scrptr2],z
+		inz
+		lda #0
+		sta [colptr],z
+		lda #>40
+		sta [scrptr1],z
+		sta [scrptr2],z
+
+		ldz #52 ; end of sphere right
+		lda #%00010000 ; gotox and transparency bits set
+		sta [colptr],z
+		lda #<320
+		sta [scrptr1],z
+		sta [scrptr2],z
+		inz
+		lda #0
+		sta [colptr],z
+		lda #>320
+		sta [scrptr1],z
+		sta [scrptr2],z
+
+		clc
+		lda colptr+0
+		adc #<160
+		sta colptr+0
+		lda colptr+1
+		adc #>160
+		sta colptr+1
+
+		clc
+		lda scrptr1+0
+		adc #<160
+		sta scrptr1+0
+		lda scrptr1+1
+		adc #>160
+		sta scrptr1+1
+
+		clc
+		lda scrptr2+0
+		adc #<160
+		sta scrptr2+0
+		lda scrptr2+1
+		adc #>160
+		sta scrptr2+1
+
+		inx
+		cpx #25
+		beq endsetatrbt
+		jmp setatrbs
+
+endsetatrbt
+
+		; ----------------------------------------- end set up gotox attribs
 
 		lda #<$0800										; set (offset!) pointer to colour ram
 		sta $d064
@@ -412,8 +650,8 @@ loop
 
 drawpoly
 
-		lda #$80
-		sta $d020
+		;lda #$80
+		;sta $d020
 
 		; ----------------------------------------------- swap points if needed
 
@@ -549,8 +787,8 @@ drawpoly
 .endscope
 .endmacro
 
-		lda #$bc
-		sta $d020
+		;lda #$bc
+		;sta $d020
 
 		; ---------------------------------------------- DRAW LEFT
 
@@ -648,7 +886,12 @@ irq1
 		;lda #$b0
 		;sta $d020
 
-		; jsr peppitoPlay
+		jsr peppitoPlay
+
+		jsr movescreen
+
+		;lda #$40
+		;sta $d020
 
 		lda flipflop
 		eor #$ff
@@ -664,10 +907,9 @@ irq1
 		sta $d062
 		lda #>.hiword(screen1)
 		sta $d063
-		lda #((screenchars2 >> 16) & $0f)
+		lda #((screenchars2 >> 16) & $0f) ; 3
 		sta linebuf
-		;DMA_RUN_JOB clearbitmapjob
-		DMA_RUN_JOB copypartialbitmapjob2
+		DMA_RUN_JOB clearpartialbitmapjob2
 		bra :++
 
 :		lda #<.loword(screen2)							; show screen2, draw to screen1
@@ -678,13 +920,14 @@ irq1
 		sta $d062
 		lda #>.hiword(screen2)
 		sta $d063
-		lda #((screenchars1 >> 16) & $0f)
+		lda #((screenchars1 >> 16) & $0f) ; 2
 		sta linebuf
-		;DMA_RUN_JOB clearbitmapjob
-		DMA_RUN_JOB copypartialbitmapjob1
+		DMA_RUN_JOB clearpartialbitmapjob1
 
 :		
 
+		;lda #$20
+		;sta $d020
 
 		jsr calc_distance
 
@@ -763,6 +1006,8 @@ foo2	ldq cos32
 		lda #$00
 rploop	sta vertindex
 
+		;inc $d020
+
 		ldz vertindex
 		ldq (vxptr),z
 		stq sx
@@ -809,6 +1054,9 @@ rploop	sta vertindex
 		beq :+
 		jmp rploop
 :
+
+		;lda #$20
+		;sta $d020
 
 		; ---------------------------- DRAW POLYGONS
 
@@ -938,8 +1186,8 @@ dploop	sta polyindex
 		sta linecolour
 
 		jsr drawpoly
-		lda #0
-		sta $d020
+		;lda #0
+		;sta $d020
 
 skippolydraw
 
@@ -1029,6 +1277,78 @@ pilo
 pihi
 		.byte 0
 
+rrbxpos	.byte 0
+
+movescreen
+
+		inc rrbxpos
+
+		; set up scr and col ptrs
+		lda #<.loword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+0
+		lda #>.loword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+1
+		lda #<.hiword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+2
+		lda #>.hiword(SAFE_COLOR_RAM+0*160+40*2)
+		sta colptr+3
+
+		lda #<.loword(screen1+0*160+40*2)
+		sta scrptr1+0
+		lda #>.loword(screen1+0*160+40*2)
+		sta scrptr1+1
+		lda #<.hiword(screen1+0*160+40*2)
+		sta scrptr1+2
+		lda #>.hiword(screen1+0*160+40*2)
+		sta scrptr1+3
+
+		lda #<.loword(screen2+0*160+40*2)
+		sta scrptr2+0
+		lda #>.loword(screen2+0*160+40*2)
+		sta scrptr2+1
+		lda #<.hiword(screen2+0*160+40*2)
+		sta scrptr2+2
+		lda #>.hiword(screen2+0*160+40*2)
+		sta scrptr2+3
+
+		; ----------------------------------------- set up gotox attribs
+
+		ldx #0
+setatrbs2
+		ldz #0
+		lda rrbxpos
+		sta [scrptr1],z
+		sta [scrptr2],z
+		inz
+		lda #0
+		sta [scrptr1],z
+		sta [scrptr2],z
+
+		clc
+		lda scrptr1+0
+		adc #<160
+		sta scrptr1+0
+		lda scrptr1+1
+		adc #>160
+		sta scrptr1+1
+
+		clc
+		lda scrptr2+0
+		adc #<160
+		sta scrptr2+0
+		lda scrptr2+1
+		adc #>160
+		sta scrptr2+1
+
+		inx
+		cpx #25
+		beq endsetatrbt2
+		jmp setatrbs2
+
+endsetatrbt2
+
+		rts
+
 ; ----------------------------------------------------------------------------------------------------
 
 clearcolorramjob
@@ -1054,7 +1374,7 @@ clearcolorramjob
 																;       6 MINTERM  SA,-DA bit
 																;       7 MINTERM  SA, DA bit
 
-				.word 40*26										; Count LSB + Count MSB
+				.word 80*26										; Count LSB + Count MSB
 
 				.word $0007										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
@@ -1083,7 +1403,7 @@ clearcolorramjob
 																;       6 MINTERM  SA,-DA bit
 																;       7 MINTERM  SA, DA bit
 
-				.word 40*26										; Count LSB + Count MSB
+				.word 80*26										; Count LSB + Count MSB
 
 				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
@@ -1100,39 +1420,11 @@ clearcolorramjob
 
 ; -------------------------------------------------------------------------------------------------
 
-clearbitmapjob
-				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
-				.byte $81, (screenchars1 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
-				;.byte $84, $00									; Destination skip rate (256ths of bytes)
-				;.byte $85, $01									; Destination skip rate (whole bytes)
-
-				.byte $00										; No more options
-
-																; 11 byte DMA List structure starts here
-				.byte %00000011									; fill and don't chain
-
-				.word 40*25*64									; Count LSB + Count MSB
-
-				.word $0001										; this is normally the source addres, but contains the fill value now
-				.byte $00										; source bank (ignored)
-
-				.word $0000										; Destination Address LSB + Destination Address MSB
-				.byte ((screenchars1 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
-																;     0–3 Memory BANK within the selected MB (0-15)
-																;       4 HOLD,      i.e., do not change the address
-																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
-																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
-																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
-
-				.word $0000
-
-; -------------------------------------------------------------------------------------------------
-
-copypartialbitmapjob1
+clearpartialbitmapjob1
 				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
 				.byte $0a ; Request format is F018A
-				.byte $80, (bmpchars >> 20) ; sourcebank
+				;.byte $80, (bmpchars >> 20) ; sourcebank
 				.byte $81, (screenchars1 >> 20) ; destbank
 
 				.byte $82, 0 ; Source skip rate (256ths of bytes)
@@ -1143,20 +1435,20 @@ copypartialbitmapjob1
 
 				.byte $00 ; No more options
 
-				.byte $00 ; Copy and last request
+				.byte %00000011	; fill and don't chain
 				.word 25*25*64 ; Size of Copy
 
-				.word bmpchars & $ffff
-				.byte (bmpchars >> 16)
+				.word 0
+				.byte 0
 
 				.word screenchars1 & $ffff
 				.byte ((screenchars1 >> 16) & $0f)
 
-copypartialbitmapjob2
+clearpartialbitmapjob2
 				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
 				.byte $0a ; Request format is F018A
-				.byte $80, (bmpchars >> 20) ; sourcebank
+				;.byte $80, (bmpchars >> 20) ; sourcebank
 				.byte $81, (screenchars2 >> 20) ; destbank
 
 				.byte $82, 0 ; Source skip rate (256ths of bytes)
@@ -1167,23 +1459,23 @@ copypartialbitmapjob2
 
 				.byte $00 ; No more options
 
-				.byte $00 ; Copy and last request
+				.byte %00000011	; fill and don't chain
 				.word 25*25*64 ; Size of Copy
 
-				.word bmpchars & $ffff
-				.byte (bmpchars >> 16)
+				.word 0
+				.byte 0
 
 				.word screenchars2 & $ffff
 				.byte ((screenchars2 >> 16) & $0f)
 
 ; -------------------------------------------------------------------------------------------------
 
-copyentirebitmapjob1
+cleare000
 				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
 				.byte $0a ; Request format is F018A
-				.byte $80, (bmpchars >> 20) ; sourcebank
-				.byte $81, (screenchars1 >> 20) ; destbank
+				;.byte $80, (bmpchars >> 20) ; sourcebank
+				.byte $81, ($e000 >> 20) ; destbank
 
 				.byte $82, 0 ; Source skip rate (256ths of bytes)
 				.byte $83, 1 ; Source skip rate (whole bytes)
@@ -1193,38 +1485,14 @@ copyentirebitmapjob1
 
 				.byte $00 ; No more options
 
-				.byte $00 ; Copy and last request
-				.word 40*25*64 ; Size of Copy
+				.byte %00000011	; fill and don't chain
+				.word 8190 ; Size of fill
 
-				.word bmpchars & $ffff
-				.byte (bmpchars >> 16)
+				.word 0
+				.byte 0
 
-				.word screenchars1 & $ffff
-				.byte ((screenchars1 >> 16) & $0f)
-
-copyentirebitmapjob2
-				;DMA_HEADER $20000 >> 20, $30000 >> 20
-				; f018a = 11 bytes, f018b is 12 bytes
-				.byte $0a ; Request format is F018A
-				.byte $80, (bmpchars >> 20) ; sourcebank
-				.byte $81, (screenchars2 >> 20) ; destbank
-
-				.byte $82, 0 ; Source skip rate (256ths of bytes)
-				.byte $83, 1 ; Source skip rate (whole bytes)
-
-				.byte $84, 0 ; Destination skip rate (256ths of bytes)
-				.byte $85, 1 ; Destination skip rate (whole bytes)
-
-				.byte $00 ; No more options
-
-				.byte $00 ; Copy and last request
-				.word 40*25*64 ; Size of Copy
-
-				.word bmpchars & $ffff
-				.byte (bmpchars >> 16)
-
-				.word screenchars2 & $ffff
-				.byte ((screenchars2 >> 16) & $0f)
+				.word $e000 & $ffff
+				.byte (($e000 >> 16) & $0f)
 
 ; -------------------------------------------------------------------------------------------------
 
