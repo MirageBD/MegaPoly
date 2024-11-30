@@ -411,39 +411,43 @@ loop
 
 
 drawpoly
-		
+
+		lda #$80
+		sta $d020
+
 		; ----------------------------------------------- swap points if needed
 
-		ldq leftX										; swap point A and B if needed
-		cmpq midX
+		lda leftX+2
+		cmp midX+2
 		bmi :+
 		SWAP leftX, midX
 		SWAP leftY, midY
-:		ldq leftX										; swap point A and C if needed
-		cmpq rightX
+:		lda leftX+2
+		cmp rightX+2
 		bmi :+
 		SWAP leftX, rightX
 		SWAP leftY, rightY
-:		ldq midX										; swap point B and C if needed
-		cmpq rightX
+:		lda midX+2
+		cmp rightX+2
 		bmi :+
 		SWAP midX, rightX
 		SWAP midY, rightY
 :
+
 		; ----------------------------------------------- calculate X spans
 
 		sec
-		ldq midX
-		sbcq leftX
-		stq leftSpanX
+		lda midX+2
+		sbc leftX+2
+		sta leftSpanX+2
 		sec
-		ldq rightX
-		sbcq midX
-		stq rightSpanX
+		lda rightX+2
+		sbc midX+2
+		sta rightSpanX+2
 		sec
-		ldq rightX
-		sbcq leftX
-		stq totalSpanX ; return here if total == 0 ?
+		lda rightX+2
+		sbc leftX+2
+		sta totalSpanX+2 ; return here if total == 0 ?
 
 		; ----------------------------------------------- calculate Y spans
 
@@ -507,33 +511,46 @@ drawpoly
 .macro SETUP_LINESTART
 		ldx x1+2
 		ldy y1+2
-		lda pixelxlo,x
-		sta linestart+0
-		lda pixelxhi,x
-		sta linestart+1
 		clc
-		lda linestart+0
+		lda pixelxlo,x
 		adc pixelylo,y
 		sta linestart+0
-		lda linestart+1
+		lda pixelxhi,x
 		adc pixelyhi,y
 		sta linestart+1
 .endmacro
 
 .macro INCREASEX delta1, delta2
-		;clc											; calculate new start y
-		ldq y1
-		adcq delta1
-		stq y1
-		;clc											; calculate new end y
-		ldq y2
-		adcq delta2
-		stq y2
-		;clc											; increase x by 1
-		ldq x1
-		adcq q1
-		stq x1
+.scope
+		;clc
+		lda y1+0
+		adc delta1+0
+		sta y1+0
+		lda y1+1
+		adc delta1+1
+		sta y1+1
+		lda y1+2
+		adc delta1+2
+		sta y1+2
+
+		;clc
+		lda y2+0
+		adc delta2+0
+		sta y2+0
+		lda y2+1
+		adc delta2+1
+		sta y2+1
+		lda y2+2
+		adc delta2+2
+		sta y2+2
+
+		inc x1+2										; increase x by 1
+		ldy x1+2
+.endscope
 .endmacro
+
+		lda #$bc
+		sta $d020
 
 		; ---------------------------------------------- DRAW LEFT
 
@@ -631,7 +648,7 @@ irq1
 		;lda #$b0
 		;sta $d020
 
-		jsr peppitoPlay
+		; jsr peppitoPlay
 
 		lda flipflop
 		eor #$ff
@@ -793,9 +810,6 @@ rploop	sta vertindex
 		jmp rploop
 :
 
-		;lda #$bc
-		;sta $d020
-
 		; ---------------------------- DRAW POLYGONS
 
 		lda #<vertsxconv
@@ -923,11 +937,9 @@ dploop	sta polyindex
 		adc fx+2
 		sta linecolour
 
-		;lda orgcol,x
-		;adc #$10
-		;sta $d020
-
 		jsr drawpoly
+		lda #0
+		sta $d020
 
 skippolydraw
 

@@ -147,12 +147,12 @@ end
 
 		lda	$d020
 		sta	$d020
-		lda	$d020
-		sta	$d020
-		lda	$d020
-		sta	$d020
-		lda	$d020
-		sta	$d020
+		;lda	$d020
+		;sta	$d020
+		;lda	$d020
+		;sta	$d020
+		;lda	$d020
+		;sta	$d020
 
 		lda DIVOUTFRACT+2
 		sta FP_A+0
