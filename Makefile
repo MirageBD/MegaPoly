@@ -51,15 +51,20 @@ OBJS = $(EXE_DIR)/boot.o $(EXE_DIR)/main.o
 
 BINFILES = $(BIN_DIR)/bitmap_chars0.bin
 BINFILES += $(BIN_DIR)/bitmap_pal0.bin
+BINFILES += $(BIN_DIR)/altpal_pal0.bin
 BINFILES += $(BIN_DIR)/song.mod
 
 BINFILESMC  = $(BIN_DIR)/bitmap_chars0.bin.addr.mc
 BINFILESMC += $(BIN_DIR)/bitmap_pal0.bin.addr.mc
+BINFILESMC += $(BIN_DIR)/altpal_pal0.bin.addr.mc
 BINFILESMC += $(BIN_DIR)/song.mod.addr.mc
 
 # -----------------------------------------------------------------------------
 
 $(BIN_DIR)/bitmap_chars0.bin: $(BIN_DIR)/bitmap.bin
+	$(MC) $< cm1:1 d1:3 cl1:10000 rc1:0
+
+$(BIN_DIR)/altpal_pal0.bin: $(BIN_DIR)/altpal.bin
 	$(MC) $< cm1:1 d1:3 cl1:10000 rc1:0
 
 $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
@@ -77,9 +82,11 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 $(BIN_DIR)/alldata.bin: $(BINFILES)
 	$(MEGAADDRESS) $(BIN_DIR)/bitmap_chars0.bin      00000000
 	$(MEGAADDRESS) $(BIN_DIR)/bitmap_pal0.bin        00000000
+	$(MEGAADDRESS) $(BIN_DIR)/altpal_pal0.bin        00000000
 	$(MEGAADDRESS) $(BIN_DIR)/song.mod               00000000
 	$(MEGACRUNCH) $(BIN_DIR)/bitmap_chars0.bin.addr
 	$(MEGACRUNCH) $(BIN_DIR)/bitmap_pal0.bin.addr
+	$(MEGACRUNCH) $(BIN_DIR)/altpal_pal0.bin.addr
 	$(MEGACRUNCH) $(BIN_DIR)/song.mod.addr
 	$(MEGAIFFL) $(BINFILESMC) $(BIN_DIR)/alldata.bin
 

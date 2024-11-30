@@ -1,6 +1,7 @@
 .define emptychar		$ff80							; size = 64
 
 .define palette			$c000
+.define altpalette		$c800
 
 .define screen1			$e000	; 40*25*2 = $0800      ; 80*25*2 = $1000
 .define screen2			$f000
@@ -156,6 +157,7 @@ entry_main
 		FLOPPY_IFFL_FAST_LOAD_INIT "MEGAPLY.IFFLCRCH"
 		FLOPPY_IFFL_FAST_LOAD_ADDRESS $00010000
 		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000c000
+		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000c800
 		FLOPPY_IFFL_FAST_LOAD_ADDRESS $00040000
 
 		jsr fl_exit
@@ -185,6 +187,9 @@ entry_main
 
 		lda #%10100000									; Clear bit7=40 column, bit5=disable ...?
 		trb $d031
+
+		lda #%00100000									; set bit 5 to enable multicolour mode, needed for alt palette
+		tsb $d031
 
 		lda #<80										; CHRCOUNT - Number of visual characters to display per row
 		sta $d05e
@@ -492,31 +497,31 @@ endscreenplot4
 		; ----------------------------------------------- END OF SCREEN SETUP
 
 		; set up scr and col ptrs
-		lda #<.loword(SAFE_COLOR_RAM+0*160+40*2)
+		lda #<.loword(SAFE_COLOR_RAM+40*2)
 		sta colptr+0
-		lda #>.loword(SAFE_COLOR_RAM+0*160+40*2)
+		lda #>.loword(SAFE_COLOR_RAM+40*2)
 		sta colptr+1
-		lda #<.hiword(SAFE_COLOR_RAM+0*160+40*2)
+		lda #<.hiword(SAFE_COLOR_RAM+40*2)
 		sta colptr+2
-		lda #>.hiword(SAFE_COLOR_RAM+0*160+40*2)
+		lda #>.hiword(SAFE_COLOR_RAM+40*2)
 		sta colptr+3
 
-		lda #<.loword(screen1+0*160+40*2)
+		lda #<.loword(screen1+40*2)
 		sta scrptr1+0
-		lda #>.loword(screen1+0*160+40*2)
+		lda #>.loword(screen1+40*2)
 		sta scrptr1+1
-		lda #<.hiword(screen1+0*160+40*2)
+		lda #<.hiword(screen1+40*2)
 		sta scrptr1+2
-		lda #>.hiword(screen1+0*160+40*2)
+		lda #>.hiword(screen1+40*2)
 		sta scrptr1+3
 
-		lda #<.loword(screen2+0*160+40*2)
+		lda #<.loword(screen2+40*2)
 		sta scrptr2+0
-		lda #>.loword(screen2+0*160+40*2)
+		lda #>.loword(screen2+40*2)
 		sta scrptr2+1
-		lda #<.hiword(screen2+0*160+40*2)
+		lda #<.hiword(screen2+40*2)
 		sta scrptr2+2
-		lda #>.hiword(screen2+0*160+40*2)
+		lda #>.hiword(screen2+40*2)
 		sta scrptr2+3
 
 		; ----------------------------------------- set up gotox attribs
@@ -580,18 +585,57 @@ setatrbs
 
 endsetatrbt
 
-		; ----------------------------------------- end set up gotox attribs
+		; ----------------------------------------- set up alt palette
+
+		; set up scr and col ptrs
+		lda #<.loword(SAFE_COLOR_RAM+41*2)
+		sta colptr+0
+		lda #>.loword(SAFE_COLOR_RAM+41*2)
+		sta colptr+1
+		lda #<.hiword(SAFE_COLOR_RAM+41*2)
+		sta colptr+2
+		lda #>.hiword(SAFE_COLOR_RAM+41*2)
+		sta colptr+3
+
+		ldx #0
+setaltpalette1
+		ldz #0
+setaltpalette2
+		lda #%00000000 ; use this for mirroring chars and stuff
+		sta [colptr],z
+		inz
+		lda #%01100000 ; bold+reverse = alt palette
+		sta [colptr],z
+		inz
+		cpz #48
+		bne setaltpalette2
+
+		clc
+		lda colptr+0
+		adc #<160
+		sta colptr+0
+		lda colptr+1
+		adc #>160
+		sta colptr+1
+
+		inx
+		cpx #25
+		beq endsetaltpalette
+		jmp setaltpalette1
+
+endsetaltpalette
+
+		; --------------------------------------------------------------------------
 
 		lda #<$0800										; set (offset!) pointer to colour ram
 		sta $d064
 		lda #>$0800
 		sta $d065
 
-		lda $d070										; select mapped bank with the upper 2 bits of $d070
-		and #%00111111
+		lda #%00000000									; set bits 6 and 7 to 00 so palette 0 is banked in
 		sta $d070
 
-		ldx #$00										; set bitmap palette
+		ldx #$00
 :		lda palette+$0000,x
 		sta $d100,x
 		lda palette+$0100,x
@@ -601,8 +645,25 @@ endsetatrbt
 		inx
 		bne :-
 
+		lda #%10000000									; set bits 6 and 7 to 01 so palette 1 is banked in
+		sta $d070
+
+		ldx #$00										; set bitmap palette
+:		lda altpalette+$0000,x
+		sta $d100,x
+		lda altpalette+$0100,x
+		sta $d200,x
+		lda altpalette+$0200,x
+		sta $d300,x
+		inx
+		bne :-
+
+		lda #%00000000									; WHY? map the first bank back in
+		sta $d070
+
 		lda $d070
-		and #%11001111									; clear bits 4 and 5 (BTPALSEL) so bitmap uses palette 0
+		and #%11000000									; set bits 4 and 5 (BTPALSEL) to 00 so bitmap palette is palette 0
+		ora #%00000010									; set bits 0 and 1 (ABTPALSEL) to 01 so alt palette is palette 1
 		sta $d070
 
 		lda #$7f										; disable CIA interrupts
@@ -1180,8 +1241,11 @@ dploop	sta polyindex
 		MATH_MUL fx, q16, fx
 
 		ldx polyindex
-		clc
+		sec
 		lda orgcol,x
+		sbc #$c0
+		asl
+		clc
 		adc fx+2
 		sta linecolour
 
@@ -1708,7 +1772,7 @@ totalSpanY		.byte $00, $00, $00, $00
 
 q0				.byte $00, $00, $00, $00
 q1				.byte $00, $00, $01, $00
-q16				.byte $00, $00, $1e, $00
+q16				.byte $00, $00, $3e, $00
 q32				.byte $00, $00, $20, $00
 q80				.byte $00, $00, $c0, $00
 q100			.byte $00, $00, $60, $00
