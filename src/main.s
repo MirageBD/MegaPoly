@@ -545,7 +545,7 @@ drawpoly
 		sta y2+2
 
 		inc x1+2										; increase x by 1
-		ldy x1+2
+		lda x1+2
 .endscope
 .endmacro
 
@@ -571,7 +571,7 @@ drawleftnoinverseloop
 		SETUP_LINESTART
 		DRAWLINE
 :		INCREASEX leftDelta, totalDelta
-		cmpq midX
+		cmp midX+2
 		bmi drawleftnoinverseloop
 		jmp drawright
 
@@ -584,7 +584,7 @@ drawleftinverseloop
 		SETUP_LINESTART
 		DRAWLINE
 :		INCREASEX totalDelta, leftDelta
-		cmpq midX
+		cmp midX+2
 		bmi drawleftinverseloop
 		jmp drawright
 
@@ -607,7 +607,7 @@ drawrightnoinverseloop
 		SETUP_LINESTART
 		DRAWLINE
 :		INCREASEX rightDelta, totalDelta
-		cmpq rightX
+		cmp rightX+2
 		bmi drawrightnoinverseloop
 		rts
 
@@ -623,7 +623,7 @@ drawrightinverseloop
 		SETUP_LINESTART
 		DRAWLINE
 :		INCREASEX totalDelta, rightDelta
-		cmpq rightX
+		cmp rightX+2
 		bmi drawrightinverseloop
 		rts
 
