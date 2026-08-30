@@ -899,8 +899,8 @@ polygon_setup:
 			sta pdlcollo+1
 			sta pdl9+1
 
-			lda leftX+3
-			sta columnhi
+			;lda leftX+3
+			;sta columnhi
 
 			clc
 			lda #>dstcolumnlo							; set variable high bytes
@@ -994,7 +994,7 @@ pdl3:
 			sta pdltop2+1
 			sta pdlcollo+1
 			sta pdl9+1
-			bne polygon_draw_loop2	; if we've crossed the 256 boundary then increase columnhi and stuff
+			bne polygon_draw_loop2	; if we've crossed the 256 (when the screen is 320 wide, which it's not) boundary then increase columnhi and stuff
 ;			inc pdlbot+2
 ;			inc pdltop1+2
 ;			inc pdltop2+2
@@ -1056,7 +1056,19 @@ irq1
 			DMA_RUN_JOB clearpartialbitmapjob1
 :		
 
-			jsr calc_distance
+			ldq q0										; calculate distance of camera
+			stq qdistance
+
+			ldx frame
+			lda sin8,x
+			lsr ; put into 0-128 range
+			sta qdistance+2
+			; divide by 32
+			MATH_DIV qdistance, q32, qdistance
+			clc
+			lda qdistance+2
+			adc #$04
+			sta qdistance+2
 
 			lda frame
 			sta angle+0
@@ -1336,31 +1348,12 @@ skippolydraw
 			asl $d019
 			rti
 
-calc_distance
-			lda #$00
-			sta qdistance+0
-			sta qdistance+1
-			sta qdistance+2
-			sta qdistance+3
-
-			ldx frame
-			lda sine,x
-			lsr ; put into 0-128 range
-			sta qdistance+2
-			; divide by 32
-			MATH_DIV qdistance, q32, qdistance
-			clc
-			lda qdistance+2
-			adc #$04
-			sta qdistance+2
-			rts
-
 ; ----------------------------------------------------------------------------------------------------
 
 movescreen
 
 			ldx frame
-			lda rrbsine,x
+			lda rrbsin8,x
 			sta rrbxpos
 
 			; set up scr and col ptrs
@@ -1578,7 +1571,7 @@ cleare000
 
 .segment "TABLES"
 
-sine
+sin8
 .byte 255, 254, 254, 254, 254, 254, 253, 253, 252, 251, 251, 250, 249, 248, 247, 246, 245, 244, 242, 241, 240, 238, 236, 235, 233, 231, 230, 228, 226, 224, 222, 219
 .byte 217, 215, 213, 210, 208, 206, 203, 201, 198, 195, 193, 190, 187, 185, 182, 179, 176, 173, 170, 167, 164, 161, 158, 155, 152, 149, 146, 143, 140, 137, 134, 131
 .byte 128, 124, 121, 118, 115, 112, 109, 106, 103, 100, 097, 094, 091, 088, 085, 082, 079, 076, 073, 070, 068, 065, 062, 060, 057, 054, 052, 049, 047, 045, 042, 040
@@ -1683,7 +1676,7 @@ cos32 ; IMPORTANT - Sin32 table hasn't ended yet. Just reusing the end for cos32
 .byte $14,$FB,$00,$00, $3B,$FC,$00,$00, $3A,$FD,$00,$00, $13,$FE,$00,$00
 .byte $C4,$FE,$00,$00, $4E,$FF,$00,$00, $B1,$FF,$00,$00, $EC,$FF,$00,$00
 
-rrbsine:
+rrbsin8:
     .byte   64,  65,  67,  68,  70,  71,  73,  74,  76,  78,  79,  81,  82,  84,  85,  87
     .byte   88,  89,  91,  92,  94,  95,  96,  98,  99, 100, 102, 103, 104, 105, 106, 108
     .byte  109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 118, 119, 120, 121, 121, 122
@@ -1749,7 +1742,7 @@ rrbxpos			.byte 0
 
 verticalcenter	.word 0
 
-columnhi:		.byte $00
+;columnhi:		.byte $00
 
 leftX			.byte $00, $00, $00, $00
 leftY			.byte $00, $00, $00, $00
