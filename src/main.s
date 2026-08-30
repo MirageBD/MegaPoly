@@ -20,9 +20,9 @@
 .define y1				$94
 .define y2				$98
 
-.define leftDelta		$9c								; overwrites rotation matrix in ZP/BP, but we're done with that anyway
-.define rightDelta		$a0
-.define totalDelta		$a4
+.define leftSlopeX		$9c								; overwrites rotation matrix in ZP/BP, but we're done with that anyway
+.define rightSlopeX		$a0
+.define totalSlopeX		$a4
 
 .define vxptr			$c0
 .define vyptr			$c2
@@ -757,26 +757,6 @@ span_skip:
 
 ; ----------------------------------------------------------------------------------------------------
 
-drawline
-						sta $d707									; inline DMA
-						;.byte $80, $00								; sourceMB
-						;.byte $81, (GFXMEM >> 20)					; destMB
-						;.byte $84, 0								; Destination skip rate (256ths of bytes)
-						.byte $85, 8								; Destination skip rate (whole bytes)
-						.byte $00									; No more options
-
-						.byte %00000011								; fill and last request
-linesize:				.word $0000									; count - needs initialising
-linecolour:				.word $00b0									; src - this is normally the source addres, but contains the fill value now
-						.byte $00									; src bank and flags (ignored)
-linestart				.word (screenchars1 & $ffff)				; dst
-linebuf					.byte ((screenchars1 >> 16) & $0f)			; dst bank and flags
-						.byte $00									; cmd hi
-						.word $0000									; modulo, ignored
-						rts
-
-; ----------------------------------------------------------------------------------------------------
-
 dma_plot_slope:
 
 					sta $d707								; inline DMA
@@ -807,8 +787,11 @@ dma_slpdadr:		.word slopetop							; dst
 
 drawpoly
 
-		;lda #$80
-		;sta $d020
+		lda linecolour
+		lsr
+		clc
+		adc #$c0
+		sta $d020
 
 		; ----------------------------------------------- swap points if needed
 
@@ -828,7 +811,6 @@ drawpoly
 		SWAP midX, rightX
 		SWAP midY, rightY
 :
-
 		; ----------------------------------------------- calculate X spans
 
 		sec
@@ -861,16 +843,16 @@ drawpoly
 
 		; ----------------------------------------------- calculate deltas
 
-		MATH_DIV leftSpanY,  leftSpanX,  leftDelta
-		MATH_DIV rightSpanY, rightSpanX, rightDelta
-		MATH_DIV totalSpanY, totalSpanX, totalDelta
+		MATH_DIV leftSpanY,  leftSpanX,  leftSlopeX
+		MATH_DIV rightSpanY, rightSpanX, rightSlopeX
+		MATH_DIV totalSpanY, totalSpanX, totalSlopeX
 
 		; ----------------------------------------------- DMA plot slopes
 
-		;MATH_DIV totalSpanX, totalSpanY, totalSlopeY
-		;GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #>slopetop,    #0					; partial span left
-		;GENERATE_SLOPE_TABLE_NONCLIPPED leftX,  midY, rightSpanX, rightSpanY, rightSlopeX, #>slopetop,    leftSpanX+2		; partial span right
-		;GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX, #>slopebottom, #0					; total span
+		MATH_DIV totalSpanX, totalSpanY, totalSlopeY
+		GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #>slopetop,    #0					; partial span left
+		GENERATE_SLOPE_TABLE_NONCLIPPED leftX,  midY, rightSpanX, rightSpanY, rightSlopeX, #>slopetop,    leftSpanX+2		; partial span right
+		GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX, #>slopebottom, #0					; total span
 
 		; check if we're inverted (I.E. longest slope is running at the top)
 		; (leftY + leftspanX * totalSlopeX) is this point (*):
@@ -886,180 +868,141 @@ drawpoly
 		;
 		; if this point is smaller than point 2 (midY), then the longest slope is at the top (inverse case)
 
-		MATH_MUL leftSpanX, totalDelta, FP_A	; optimise this later. no need to store in temp Q reg
-		ldq FP_A
+		MATH_MUL leftSpanX, totalSlopeX, FP_A	; optimise this later. no need to store in temp Q reg
+		;ldq FP_A ; Q should already contain correct value
 		clc
 		adcq leftY
 		cmpq midY
 		bmi plg_inverse
 plg_noninverse:
-		lda #$00
-		sta inverse
-		;lda #>slopebottom
-		;sta pdlbot+2
-		;lda #>slopetop
-		;sta pdltop1+2
-		;sta pdltop2+2
+		lda #>slopebottom
+		sta pdlbot+2
+		lda #>slopetop
+		sta pdltop1+2
+		sta pdltop2+2
 		bra plg_checkend
 plg_inverse:		
-		lda #$01
-		sta inverse
-		;lda #>slopetop
-		;sta pdlbot+2
-		;lda #>slopebottom
-		;sta pdltop1+2
-		;sta pdltop2+2		
+		lda #>slopetop
+		sta pdlbot+2
+		lda #>slopebottom
+		sta pdltop1+2
+		sta pdltop2+2		
 plg_checkend
 
 		; ----------------------------------------------- set up polygon
 
-		ldq leftY
-		stq y1
-		stq y2
+polygon_setup:
 
+			lda leftX+2										; set all variabe low bytes
+			sta pdlbot+1
+			sta pdltop1+1
+			sta pdltop2+1
+			sta pdlcollo+1
+			sta pdl9+1
 
+			lda leftX+3
+			sta columnhi
 
+			clc
+			lda #>dstcolumnlo							; set variable high bytes
+			adc leftX+3
+			sta pdlcollo+2
+			clc
+			lda #>dstcolumnhi
+			adc leftX+3
+			sta pdl9+2
 
+			clc
+			lda pdlbot+2
+			adc leftX+3
+			sta pdlbot+2
 
-.macro SETUP_START_XY xx, yy
-		ldq xx
-		stq x1
-		ldq yy
-		stq y1
-.endmacro
+			clc
+			lda pdltop1+2
+			adc leftX+3
+			sta pdltop1+2
+			sta pdltop2+2
 
-.macro CALCULATE_SPAN
-		sec
-		lda y2+2
-		sbc y1+2
-		sta linesize+0
-.endmacro
+			; ----------------------------------------------- do the actual polygon drawing loop.
 
-.macro SETUP_LINESTART
-		ldx x1+2
-		ldy y1+2
-		clc
-		lda pixelxlo,x
-		adc pixelylo,y
-		sta linestart+0
-		lda pixelxhi,x
-		adc pixelyhi,y
-		sta linestart+1
-.endmacro
+			ldq q0												; get ready to multiply stuff by 8 in inner loop
+			stq MULTINA
+			lda #8
+			sta MULTINA+0
+			ldq q0
+			stq MULTINB
 
-.macro INCREASEX delta1, delta2
-.scope
-		;clc
-		lda y1+0
-		adc delta1+0
-		sta y1+0
-		lda y1+1
-		adc delta1+1
-		sta y1+1
-		lda y1+2
-		adc delta1+2
-		sta y1+2
+polygon_draw_loop:
 
-		;clc
-		lda y2+0
-		adc delta2+0
-		sta y2+0
-		lda y2+1
-		adc delta2+1
-		sta y2+1
-		lda y2+2
-		adc delta2+2
-		sta y2+2
+			lda pdlbot+1
 
-		inc x1+2										; increase x by 1
-		lda x1+2
-.endscope
-.endmacro
+polygon_draw_loop2:
 
-		;lda #$bc
-		;sta $d020
+			cmp rightX+2
+			bne polygon_continue_draw
+			;lda columnhi
+			;cmp rightX+3
+			;bne polygon_continue_draw
 
-		; ---------------------------------------------- DRAW LEFT
+			lda #$00
+			sta $d020
 
-drawleft
-		ldq leftSpanX
-		bne :+
-		jmp drawright									; don't draw left side if it doesn't exist
-:		lda inverse
-		beq drawleftnoinverse
-		jmp drawleftinverse
+			rts
 
-drawleftnoinverse
-		SETUP_START_XY leftX, leftY
+polygon_continue_draw:
 
-drawleftnoinverseloop
-		CALCULATE_SPAN
-		beq :+
-		SETUP_LINESTART
-		jsr drawline ; DRAWLINE
-:		INCREASEX leftDelta, totalDelta
-		cmp midX+2
-		bmi drawleftnoinverseloop
-		jmp drawright
+			sec
+pdlbot:		lda $ff00											; get bottom y
+pdltop1		sbc $ff00											; subtract top y to get span size
+			bcs pdlpos											; continue if positive
+			bra pdl3											; otherwise skip span
+pdlpos:		bne pdl2											; continue if not 0
+			bra pdl3											; otherwise skip span
+pdl2:		sta linesize+0
 
-drawleftinverse ; -------------------------------------- INVERSE
-		SETUP_START_XY leftX, leftY
+pdltop2:	ldy $ff00
+			sty MULTINB+0
+			clc
+			lda MULTOUT+0 ; times8lo,y
+pdlcollo:	adc dstcolumnlo
+			sta linestart+0
+			lda MULTOUT+1; times8hi,y
+pdl9:		adc dstcolumnhi
+			sta linestart+1
 
-drawleftinverseloop
-		CALCULATE_SPAN
-		beq :+
-		SETUP_LINESTART
-		jsr drawline ; DRAWLINE
-:		INCREASEX totalDelta, leftDelta
-		cmp midX+2
-		bmi drawleftinverseloop
-		jmp drawright
+drawspan:
+				sta $d707									; inline DMA
+				;.byte $80, 0x00							; sourceMB
+				;.byte $81, (screenchars1 >> 20)			; destMB
+				;.byte $84, 0								; Destination skip rate (256ths of bytes)
+				.byte $85, 8								; Destination skip rate (whole bytes)
+				.byte $00									; No more options
 
-		; ---------------------------------------------- DRAW RIGHT
+				.byte %00000011								; fill and last request
+linesize:		.word $0000									; count - needs initialising
+linecolour:		.word $00b0									; src - this is normally the source addres, but contains the fill value now
+				.byte $00									; src bank and flags (ignored)
 
-drawright
-		ldq rightSpanX
-		bne :+
-		rts												; don't draw right side if it doesn't exist
-:		lda inverse
-		beq drawrightnoinverse
-		jmp drawrightinverse
+linestart		.word (screenchars1 & $ffff)				; dst
+linebuf			.byte ((screenchars1 >> 16) & $0f)			; dst bank and flags
+				.byte $00									; cmd hi
+				.word $0000									; modulo, ignored
 
-drawrightnoinverse
-		SETUP_START_XY midX, midY
-
-drawrightnoinverseloop
-		CALCULATE_SPAN
-		beq :+
-		SETUP_LINESTART
-		jsr drawline ; DRAWLINE
-:		INCREASEX rightDelta, totalDelta
-		cmp rightX+2
-		bmi drawrightnoinverseloop
-		rts
-
-drawrightinverse ; ------------------------------------- INVERSE
-		ldq midX
-		stq x1
-		ldq midY
-		stq y2											; refresh memory - why y2 and not y1?
-
-drawrightinverseloop
-		CALCULATE_SPAN
-		beq :+
-		SETUP_LINESTART
-		jsr drawline ; DRAWLINE
-:		INCREASEX totalDelta, rightDelta
-		cmp rightX+2
-		bmi drawrightinverseloop
-		rts
-
-
-
-
-
-
-
+pdl3:
+			inc pdlbot+1
+			lda pdlbot+1
+			sta pdltop1+1
+			sta pdltop2+1
+			sta pdlcollo+1
+			sta pdl9+1
+			bne polygon_draw_loop2	; if we've crossed the 256 boundary then increase columnhi and stuff
+;			inc pdlbot+2
+;			inc pdltop1+2
+;			inc pdltop2+2
+;			inc pdlcollo+2
+;			inc pdl9+2
+;			inc columnhi
+;pdl7:		bra polygon_draw_loop
 
 
 ; ----------------------------------------------------------------------------------------------------
@@ -1075,7 +1018,7 @@ irq1
 		;lda #$b0
 		;sta $d020
 
-		;jsr peppitoPlay
+		jsr peppitoPlay
 
 		jsr movescreen
 
@@ -1115,15 +1058,7 @@ irq1
 
 :		
 
-		;lda #$20
-		;sta $d020
-
 		jsr calc_distance
-
-		;lda #$b4
-		;sta $d020
-
-		;inc $d020
 
 		lda frame
 		sta angle+0
@@ -1259,8 +1194,8 @@ rploop	sta vertindex
 		lda #$00
 dploop	sta polyindex
 
-		lda #$00
-		sta $d020
+		;lda #$00
+		;sta $d020
 
 		ldx polyindex
 		ldz indicesp1,x
@@ -1380,11 +1315,6 @@ dploop	sta polyindex
 		adc fx+2
 		sta linecolour
 
-		lsr
-		clc
-		adc #$c0
-		sta $d020
-
 		jsr drawpoly
 		;lda #0
 		;sta $d020
@@ -1398,7 +1328,6 @@ skippolydraw
 		beq :+
 		jmp dploop
 :
-
 
 		ldx #$00
 		stx $d020
@@ -1429,26 +1358,6 @@ calc_distance
 		rts
 
 .align 256
-
-pixelxlo
-		.repeat 64, I
-			.byte <((I*25*64) + 0), <((I*25*64) + 1), <((I*25*64) + 2), <((I*25*64) + 3), <((I*25*64) + 4), <((I*25*64) + 5), <((I*25*64) + 6), <((I*25*64) + 7)
-		.endrepeat
-
-pixelxhi
-		.repeat 64, I
-			.byte >((I*25*64) + 0), >((I*25*64) + 1), >((I*25*64) + 2), >((I*25*64) + 3), >((I*25*64) + 4), >((I*25*64) + 5), >((I*25*64) + 6), >((I*25*64) + 7)
-		.endrepeat
-
-pixelylo
-		.repeat 256, I
-			.byte <(I*8)
-		.endrepeat
-
-pixelyhi
-		.repeat 256, I
-			.byte >(I*8)
-		.endrepeat
 
 frame
 		.byte $00
@@ -1888,16 +1797,28 @@ lineartable
 .endrepeat		
 
 slopetop
-.repeat 512					; 512 for 0-320 range
+.repeat 256
 		.byte 0
 .endrepeat		
 
 slopebottom
-.repeat 512					; 512 for 0-320 range
+.repeat 256
 		.byte 0
 .endrepeat		
 
+dstcolumnlo
+		.repeat 64, I
+			.byte <((I*25*64) + 0), <((I*25*64) + 1), <((I*25*64) + 2), <((I*25*64) + 3), <((I*25*64) + 4), <((I*25*64) + 5), <((I*25*64) + 6), <((I*25*64) + 7)
+		.endrepeat
+
+dstcolumnhi
+		.repeat 64, I
+			.byte >((I*25*64) + 0), >((I*25*64) + 1), >((I*25*64) + 2), >((I*25*64) + 3), >((I*25*64) + 4), >((I*25*64) + 5), >((I*25*64) + 6), >((I*25*64) + 7)
+		.endrepeat
+
 verticalcenter	.word 0
+
+columnhi:		.byte $00
 
 leftX			.byte $00, $00, $00, $00
 leftY			.byte $00, $00, $00, $00
@@ -1919,9 +1840,6 @@ leftSpanY		.byte $00, $00, $00, $00
 rightSpanY		.byte $00, $00, $00, $00
 totalSpanY		.byte $00, $00, $00, $00
 
-leftSlopeX		.byte $00, $00, $00, $00
-rightSlopeX		.byte $00, $00, $00, $00
-totalSlopeX		.byte $00, $00, $00, $00
 totalSlopeY		.byte $00, $00, $00, $00
 
 q0				.byte $00, $00, $00, $00
@@ -1932,8 +1850,6 @@ q80				.byte $00, $00, $c0, $00
 q100			.byte $00, $00, $60, $00
 
 qdistance		.byte $00, $00, $08, $00
-
-inverse			.byte $00
 
 lightvec		.byte $00, $00, $00 ,$00,    $00, $00, $00, $00,    $00, $00, $01, $00
 

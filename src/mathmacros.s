@@ -182,22 +182,27 @@ end
 
 .macro MATH_MUL opA, opB, result
 .scope
-		MATH_ABS opA, MULTINA
-		MATH_ABS opB, MULTINB
+				bit opA+3
+				bpl posa
+				MATH_NEG opA, MULTINA			; a is negative
+nega:			bit opB+3
+				bpl posb1
+				MATH_NEG opB, MULTINB			; a is negative, b is negative - use positive result
+				bra posresult
+posb1:			MATH_MOV opB, MULTINB			; a is negative, b is positive - use negative result
+				bra negresult
 
-        bit opA+3
-        bmi negtive						; a is not negative
-        bit opB+3
-        bmi nnegtive					; a is negative, but b is not, use negative result
-        bra plus						; a is negative and b also. use result as is
-negtive
-		bit opB+3
-		bmi plus						; b is also not negative. use result as is
-nnegtive
-		MATH_NEG MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
-		bra end
-plus
-		MATH_MOV MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
-end
+posa:			MATH_MOV opA, MULTINA			; a is positive
+				bit opB+3
+				bpl posb2
+				MATH_NEG opB, MULTINB			; a is positive, b is negative - use negative result
+				bra negresult
+posb2:			MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
+				bra posresult
+
+negresult:		MATH_NEG MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
+				bra end
+posresult:		MATH_MOV MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
+end:
 .endscope
 .endmacro
