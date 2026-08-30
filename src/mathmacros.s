@@ -3,8 +3,8 @@
 
 .define MULTOUT			$d778
 
-.define DIVOUTWHOLE		$d76c
-.define DIVOUTFRACT		$d768
+.define DIVOUTWHOLE		$d768
+.define DIVOUTFRACT		$d76c
 
 .define sx $40			; sin
 .define sy $44
@@ -142,41 +142,19 @@ end
 
 .macro MATH_DIV numerator, denominator, result
 .scope
-		MATH_ABS numerator, MULTINA
-		MATH_ABS denominator, MULTINB
-
-		lda	$d020
-		sta	$d020
-		;lda	$d020
-		;sta	$d020
-		;lda	$d020
-		;sta	$d020
-		;lda	$d020
-		;sta	$d020
-
-		lda DIVOUTFRACT+2
-		sta FP_A+0
-		lda DIVOUTFRACT+3
-		sta FP_A+1
-		lda DIVOUTWHOLE+0
-		sta FP_A+2
-		lda DIVOUTWHOLE+1
-		sta FP_A+3
-
-        bit numerator+3
-        bmi negtive						; a is not negative
-        bit denominator+3
-        bmi nnegtive					; a is negative, but b is not, use negative result
-        bra plus						; a is negative and b also. use result as is
-negtive
-		bit denominator+3
-		bmi plus						; b is also not negative. use result as is
-nnegtive
-		MATH_NEG FP_A, result
-		bra end
-plus
-		MATH_MOV FP_A, result
-end
+						MATH_ABS numerator, MULTINA
+						MATH_ABS denominator, MULTINB
+						bit numerator+3
+						bmi negtivea					; a is negative
+						bit denominator+3
+						bmi negtiveb					; a is positive, but b is not - use negative result
+						bra plus						; a is positive and so is b - use positive result
+negtivea:				bit denominator+3
+						bmi plus						; a is negative and so is b - use plus result
+negtiveb:				MATH_NEG DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point result
+						bra end
+plus:					MATH_MOV DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point result
+end:
 .endscope
 .endmacro
 
