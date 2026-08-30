@@ -704,10 +704,106 @@ loop
 		stq that
 .endmacro		
 
-.macro DRAWLINE
-		DMA_RUN_JOB_FAST drawlinejob
+.macro GENERATE_SLOPE_TABLE_NONCLIPPED startx, starty, spanx, spany, delta, destinationhi, destinationlo
+.scope
+						lda spanx+3										; test if span == 0
+						beq span_couldbe0
+						bra span_biggerthan256							; not zero, continue
+span_couldbe0:			lda spanx+2
+						beq span_skip									; high AND low span both 0 -> skip rendering
+span_biggerthan256:
+						lda spanx+2
+						sta dma_slpcount+0
+						lda spanx+3
+						sta dma_slpcount+1
+
+						lda starty+2									; Y start
+						sta dma_slpsadr+0
+						;lda starty+1									; Y start fraction
+						;sta dma_slpsadrfrac+1
+						clc
+						lda destinationlo								; put Y numbers at xxyy
+						adc startx+2
+						sta dma_slpdadr+0
+						lda destinationhi								; put Y numbers at xxyy
+						;adc startx+3
+						sta dma_slpdadr+1
+
+						bit spany+3										; if Y span negative, then set DMA to render in reverse direction (and negate delta to start in reverse order)
+						bmi span_negative
+;span_positive:
+						lda delta+1										; Y/X delta low
+						sta dma_slpsskiplo+1
+						lda delta+2										; Y/X delta high
+						sta dma_slpsskiphi+1
+						lda #%00000000									; positive DMA copy
+						sta dma_slpdir
+						bra span_finalise
+span_negative:
+						lda delta+1										; negative Y/X delta low
+						eor #$ff
+						sta dma_slpsskiplo+1
+						lda delta+2										; negative Y/X delta low
+						eor #$ff
+						sta dma_slpsskiphi+1
+						lda #%00010000									; negative DMA copy
+						sta dma_slpdir
+						;jmp span_finalise
+
+span_finalise:			jsr dma_plot_slope
+span_skip:
+.endscope
 .endmacro
 
+; ----------------------------------------------------------------------------------------------------
+
+drawline
+						sta $d707									; inline DMA
+						;.byte $80, $00								; sourceMB
+						;.byte $81, (GFXMEM >> 20)					; destMB
+						;.byte $84, 0								; Destination skip rate (256ths of bytes)
+						.byte $85, 8								; Destination skip rate (whole bytes)
+						.byte $00									; No more options
+
+						.byte %00000011								; fill and last request
+linesize:				.word $0000									; count - needs initialising
+linecolour:				.word $00b0									; src - this is normally the source addres, but contains the fill value now
+						.byte $00									; src bank and flags (ignored)
+linestart				.word (screenchars1 & $ffff)				; dst
+linebuf					.byte ((screenchars1 >> 16) & $0f)			; dst bank and flags
+						.byte $00									; cmd hi
+						.word $0000									; modulo, ignored
+						rts
+
+; ----------------------------------------------------------------------------------------------------
+
+dma_plot_slope:
+
+					sta $d707								; inline DMA
+					.byte $06								; Disable use of transparent value
+						;.byte $80, $00							; sourceMB
+						;.byte $81, $00							; destMB - ignored when drawing lines
+dma_slpsskiplo:		.byte $82, 0							; Source skip rate (256ths of bytes)
+dma_slpsskiphi:		.byte $83, 0							; Source skip rate (whole bytes)
+						;.byte $84, 0							; Destination skip rate (256ths of bytes)
+					.byte $85, 1							; Destination skip rate (whole bytes)
+						;.byte $8f, %00000000					; bit 7 = enable DESTINATION line drawing, Bit 6 = select X or Y direction, Bit 5 = slope is negative.
+;dma_slpsadrfrac:	.byte $91, 0							; linear source initial fractional part.
+						;.byte $92, 0							; linear destination initial fractional part.
+						;.byte $9f, %00000000					; bit 7 = enable SOURCE line drawing, Bit 6 = select X or Y direction, Bit 5 = slope is negative.
+					.byte $00								; end of job options
+
+dma_slpdir:			.byte $00 | %00000000					; copy (bit 5 = invert source, bit 6 = invert destination)
+dma_slpcount:		.word $0000								; count - needs initialising
+dma_slpsadr:		.word lineartable						; src
+					.byte $00								; src bank and flags
+dma_slpdadr:		.word slopetop							; dst
+					.byte $00								; dst bank and flags
+					.byte $00								; cmd hi
+					.word $0000								; modulo, ignored
+					rts
+
+; ----------------------------------------------------------------------------------------------------
 
 drawpoly
 
@@ -769,20 +865,52 @@ drawpoly
 		MATH_DIV rightSpanY, rightSpanX, rightDelta
 		MATH_DIV totalSpanY, totalSpanX, totalDelta
 
+		; ----------------------------------------------- DMA plot slopes
+
+		;MATH_DIV totalSpanX, totalSpanY, totalSlopeY
+		;GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #>slopetop,    #0					; partial span left
+		;GENERATE_SLOPE_TABLE_NONCLIPPED leftX,  midY, rightSpanX, rightSpanY, rightSlopeX, #>slopetop,    leftSpanX+2		; partial span right
+		;GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX, #>slopebottom, #0					; total span
+
 		; check if we're inverted (I.E. longest slope is running at the top)
+		; (leftY + leftspanX * totalSlopeX) is this point (*):
+		;
+		;   (1) ---___
+		;        -    (*)-____
+		;         -    |      --- (3)
+		;          -   |       -
+		;           -  |     -
+		;            - |   -
+		;             -| -
+		;             (2)
+		;
+		; if this point is smaller than point 2 (midY), then the longest slope is at the top (inverse case)
 
 		MATH_MUL leftSpanX, totalDelta, FP_A	; optimise this later. no need to store in temp Q reg
 		ldq FP_A
 		clc
 		adcq leftY
 		cmpq midY
-		bmi :+
+		bmi plg_inverse
+plg_noninverse:
 		lda #$00
 		sta inverse
-		bra :++
-:		lda #$01
+		;lda #>slopebottom
+		;sta pdlbot+2
+		;lda #>slopetop
+		;sta pdltop1+2
+		;sta pdltop2+2
+		bra plg_checkend
+plg_inverse:		
+		lda #$01
 		sta inverse
-:
+		;lda #>slopetop
+		;sta pdlbot+2
+		;lda #>slopebottom
+		;sta pdltop1+2
+		;sta pdltop2+2		
+plg_checkend
+
 		; ----------------------------------------------- set up polygon
 
 		ldq leftY
@@ -868,7 +996,7 @@ drawleftnoinverseloop
 		CALCULATE_SPAN
 		beq :+
 		SETUP_LINESTART
-		DRAWLINE
+		jsr drawline ; DRAWLINE
 :		INCREASEX leftDelta, totalDelta
 		cmp midX+2
 		bmi drawleftnoinverseloop
@@ -881,7 +1009,7 @@ drawleftinverseloop
 		CALCULATE_SPAN
 		beq :+
 		SETUP_LINESTART
-		DRAWLINE
+		jsr drawline ; DRAWLINE
 :		INCREASEX totalDelta, leftDelta
 		cmp midX+2
 		bmi drawleftinverseloop
@@ -904,7 +1032,7 @@ drawrightnoinverseloop
 		CALCULATE_SPAN
 		beq :+
 		SETUP_LINESTART
-		DRAWLINE
+		jsr drawline ; DRAWLINE
 :		INCREASEX rightDelta, totalDelta
 		cmp rightX+2
 		bmi drawrightnoinverseloop
@@ -920,7 +1048,7 @@ drawrightinverseloop
 		CALCULATE_SPAN
 		beq :+
 		SETUP_LINESTART
-		DRAWLINE
+		jsr drawline ; DRAWLINE
 :		INCREASEX totalDelta, rightDelta
 		cmp rightX+2
 		bmi drawrightinverseloop
@@ -947,7 +1075,7 @@ irq1
 		;lda #$b0
 		;sta $d020
 
-		jsr peppitoPlay
+		;jsr peppitoPlay
 
 		jsr movescreen
 
@@ -991,9 +1119,6 @@ irq1
 		;sta $d020
 
 		jsr calc_distance
-
-		; initialize dma job pointers before we start drawing polygons
-		DMA_INIT_FAST_JOB drawlinejob
 
 		;lda #$b4
 		;sta $d020
@@ -1134,6 +1259,9 @@ rploop	sta vertindex
 		lda #$00
 dploop	sta polyindex
 
+		lda #$00
+		sta $d020
+
 		ldx polyindex
 		ldz indicesp1,x
 		ldq (vxcptr),z
@@ -1192,32 +1320,35 @@ dploop	sta polyindex
 
 		; ROTATE/LIGHT NORMALS/POLYS
 
-		ldx polyindex
-		lda times4lo,x
+		ldx polyindex							; get poly index
+		lda times4lo,x							; and multiply by 4
 		sta pilo
+		sta vxptr+0
+		sta vyptr+0
+		sta vzptr+0
 		lda times4hi,x
 		sta pihi
 
-		clc
-		lda #<normalsx
-		adc pilo
-		sta vxptr+0
+		clc										; add normalsx address
+		;lda #<normalsx
+		;adc pilo
+		;sta vxptr+0
 		lda #>normalsx
 		adc pihi
 		sta vxptr+1
 
 		clc
-		lda #<normalsy
-		adc pilo
-		sta vyptr+0
+		;lda #<normalsy
+		;adc pilo
+		;sta vyptr+0
 		lda #>normalsy
 		adc pihi
 		sta vyptr+1
 
 		clc
-		lda #<normalsz
-		adc pilo
-		sta vzptr+0
+		;lda #<normalsz
+		;adc pilo
+		;sta vzptr+0
 		lda #>normalsz
 		adc pihi
 		sta vzptr+1
@@ -1248,6 +1379,11 @@ dploop	sta polyindex
 		clc
 		adc fx+2
 		sta linecolour
+
+		lsr
+		clc
+		adc #$c0
+		sta $d020
 
 		jsr drawpoly
 		;lda #0
@@ -1563,29 +1699,6 @@ cleare000
 
 ; -------------------------------------------------------------------------------------------------
 
-drawlinejob
-				.byte $0a ; Request format is F018A
-				.byte $81, (screenchars1 >> 20) ; destbank
-
-				.byte $84, 0 ; Destination skip rate (256ths of bytes)
-				.byte $85, 8 ; Destination skip rate (whole bytes)
-
-				.byte $00 ; No more options
-
-				.byte %00000011	; fill and last request
-
-linesize		.word 1 ; Size of Copy
-
-linecolour		.word $0001	; this is normally the source addres, but contains the fill value now
-				.byte $00	; source bank (ignored)
-
-linestart		.word (screenchars1 & $ffff)
-linebuf			.byte ((screenchars1 >> 16) & $0f)
-
-				.word $0000 ; MSB command
-
-; -------------------------------------------------------------------------------------------------
-
 .segment "TABLES"
 
 sine
@@ -1769,6 +1882,21 @@ times4hi
 		.byte >(I*4)
 .endrepeat
 
+lineartable
+.repeat 256, I
+		.byte I
+.endrepeat		
+
+slopetop
+.repeat 512					; 512 for 0-320 range
+		.byte 0
+.endrepeat		
+
+slopebottom
+.repeat 512					; 512 for 0-320 range
+		.byte 0
+.endrepeat		
+
 verticalcenter	.word 0
 
 leftX			.byte $00, $00, $00, $00
@@ -1790,6 +1918,11 @@ totalSpanX		.byte $00, $00, $00, $00
 leftSpanY		.byte $00, $00, $00, $00
 rightSpanY		.byte $00, $00, $00, $00
 totalSpanY		.byte $00, $00, $00, $00
+
+leftSlopeX		.byte $00, $00, $00, $00
+rightSlopeX		.byte $00, $00, $00, $00
+totalSlopeX		.byte $00, $00, $00, $00
+totalSlopeY		.byte $00, $00, $00, $00
 
 q0				.byte $00, $00, $00, $00
 q1				.byte $00, $00, $01, $00
