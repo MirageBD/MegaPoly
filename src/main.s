@@ -706,51 +706,50 @@ loop
 
 .macro GENERATE_SLOPE_TABLE_NONCLIPPED startx, starty, spanx, spany, delta, destinationhi, destinationlo
 .scope
-						lda spanx+3										; test if span == 0
-						beq span_couldbe0
-						bra span_biggerthan256							; not zero, continue
-span_couldbe0:			lda spanx+2
-						beq span_skip									; high AND low span both 0 -> skip rendering
-span_biggerthan256:
-						lda spanx+2
-						sta dma_slpcount+0
-						lda spanx+3
-						sta dma_slpcount+1
+					lda spanx+3										; test if span == 0
+					beq span_couldbe0
+					bra span_biggerthan256							; not zero, continue
+span_couldbe0:		lda spanx+2
+					beq span_skip									; high AND low span both 0 -> skip rendering
+span_biggerthan256:	lda spanx+2
+					sta dma_slpcount+0
+					lda spanx+3
+					sta dma_slpcount+1
 
-						lda starty+2									; Y start
-						sta dma_slpsadr+0
-						;lda starty+1									; Y start fraction
-						;sta dma_slpsadrfrac+1
-						clc
-						lda destinationlo								; put Y numbers at xxyy
-						adc startx+2
-						sta dma_slpdadr+0
-						lda destinationhi								; put Y numbers at xxyy
-						;adc startx+3
-						sta dma_slpdadr+1
+					lda starty+2									; Y start
+					sta dma_slpsadr+0
+					;lda starty+1									; Y start fraction
+					;sta dma_slpsadrfrac+1
+					clc
+					lda destinationlo								; put Y numbers at xxyy
+					adc startx+2
+					sta dma_slpdadr+0
+					lda destinationhi								; put Y numbers at xxyy
+					;adc startx+3
+					sta dma_slpdadr+1
 
-						bit spany+3										; if Y span negative, then set DMA to render in reverse direction (and negate delta to start in reverse order)
-						bmi span_negative
+					bit spany+3										; if Y span negative, then set DMA to render in reverse direction (and negate delta to start in reverse order)
+					bmi span_negative
 ;span_positive:
-						lda delta+1										; Y/X delta low
-						sta dma_slpsskiplo+1
-						lda delta+2										; Y/X delta high
-						sta dma_slpsskiphi+1
-						lda #%00000000									; positive DMA copy
-						sta dma_slpdir
-						bra span_finalise
+					lda delta+1										; Y/X delta low
+					sta dma_slpsskiplo+1
+					lda delta+2										; Y/X delta high
+					sta dma_slpsskiphi+1
+					lda #%00000000									; positive DMA copy
+					sta dma_slpdir
+					bra span_finalise
 span_negative:
-						lda delta+1										; negative Y/X delta low
-						eor #$ff
-						sta dma_slpsskiplo+1
-						lda delta+2										; negative Y/X delta low
-						eor #$ff
-						sta dma_slpsskiphi+1
-						lda #%00010000									; negative DMA copy
-						sta dma_slpdir
-						;jmp span_finalise
+					lda delta+1										; negative Y/X delta low
+					eor #$ff
+					sta dma_slpsskiplo+1
+					lda delta+2										; negative Y/X delta low
+					eor #$ff
+					sta dma_slpsskiphi+1
+					lda #%00010000									; negative DMA copy
+					sta dma_slpdir
+					;jmp span_finalise
 
-span_finalise:			jsr dma_plot_slope
+span_finalise:		jsr dma_plot_slope
 span_skip:
 .endscope
 .endmacro
@@ -787,106 +786,106 @@ dma_slpdadr:		.word slopetop							; dst
 
 drawpoly
 
-		lda linecolour
-		lsr
-		clc
-		adc #$c0
-		sta $d020
+			lda linecolour
+			lsr
+			clc
+			adc #$c0
+			sta $d020
 
-		; ----------------------------------------------- swap points if needed
+			; ----------------------------------------------- swap points if needed
 
-		lda leftX+2
-		cmp midX+2
-		bmi :+
-		SWAP leftX, midX
-		SWAP leftY, midY
-:		lda leftX+2
-		cmp rightX+2
-		bmi :+
-		SWAP leftX, rightX
-		SWAP leftY, rightY
-:		lda midX+2
-		cmp rightX+2
-		bmi :+
-		SWAP midX, rightX
-		SWAP midY, rightY
+			lda leftX+2
+			cmp midX+2
+			bmi :+
+			SWAP leftX, midX
+			SWAP leftY, midY
+:			lda leftX+2
+			cmp rightX+2
+			bmi :+
+			SWAP leftX, rightX
+			SWAP leftY, rightY
+:			lda midX+2
+			cmp rightX+2
+			bmi :+
+			SWAP midX, rightX
+			SWAP midY, rightY
 :
-		; ----------------------------------------------- calculate X spans
+			; ----------------------------------------------- calculate X spans
 
-		sec
-		lda midX+2
-		sbc leftX+2
-		sta leftSpanX+2
-		sec
-		lda rightX+2
-		sbc midX+2
-		sta rightSpanX+2
-		sec
-		lda rightX+2
-		sbc leftX+2
-		sta totalSpanX+2 ; return here if total == 0 ?
+			sec
+			lda midX+2
+			sbc leftX+2
+			sta leftSpanX+2
+			sec
+			lda rightX+2
+			sbc midX+2
+			sta rightSpanX+2
+			sec
+			lda rightX+2
+			sbc leftX+2
+			sta totalSpanX+2 ; return here if total == 0 ?
 
-		; ----------------------------------------------- calculate Y spans
+			; ----------------------------------------------- calculate Y spans
 
-		sec	
-		ldq midY
-		sbcq leftY
-		stq leftSpanY
-		sec
-		ldq rightY
-		sbcq midY
-		stq rightSpanY
-		sec
-		ldq rightY
-		sbcq leftY
-		stq totalSpanY
+			sec	
+			ldq midY
+			sbcq leftY
+			stq leftSpanY
+			sec
+			ldq rightY
+			sbcq midY
+			stq rightSpanY
+			sec
+			ldq rightY
+			sbcq leftY
+			stq totalSpanY
 
-		; ----------------------------------------------- calculate deltas
+			; ----------------------------------------------- calculate deltas
 
-		MATH_DIV leftSpanY,  leftSpanX,  leftSlopeX
-		MATH_DIV rightSpanY, rightSpanX, rightSlopeX
-		MATH_DIV totalSpanY, totalSpanX, totalSlopeX
+			MATH_DIV leftSpanY,  leftSpanX,  leftSlopeX
+			MATH_DIV rightSpanY, rightSpanX, rightSlopeX
+			MATH_DIV totalSpanY, totalSpanX, totalSlopeX
 
-		; ----------------------------------------------- DMA plot slopes
+			; ----------------------------------------------- DMA plot slopes
 
-		MATH_DIV totalSpanX, totalSpanY, totalSlopeY
-		GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #>slopetop,    #0					; partial span left
-		GENERATE_SLOPE_TABLE_NONCLIPPED leftX,  midY, rightSpanX, rightSpanY, rightSlopeX, #>slopetop,    leftSpanX+2		; partial span right
-		GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX, #>slopebottom, #0					; total span
+			MATH_DIV totalSpanX, totalSpanY, totalSlopeY
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #>slopetop,    #0					; partial span left
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftX,  midY, rightSpanX, rightSpanY, rightSlopeX, #>slopetop,    leftSpanX+2		; partial span right
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX, #>slopebottom, #0					; total span
 
-		; check if we're inverted (I.E. longest slope is running at the top)
-		; (leftY + leftspanX * totalSlopeX) is this point (*):
-		;
-		;   (1) ---___
-		;        -    (*)-____
-		;         -    |      --- (3)
-		;          -   |       -
-		;           -  |     -
-		;            - |   -
-		;             -| -
-		;             (2)
-		;
-		; if this point is smaller than point 2 (midY), then the longest slope is at the top (inverse case)
+			; check if we're inverted (I.E. longest slope is running at the top)
+			; (leftY + leftspanX * totalSlopeX) is this point (*):
+			;
+			;   (1) ---___
+			;        -    (*)-____
+			;         -    |      --- (3)
+			;          -   |       -
+			;           -  |     -
+			;            - |   -
+			;             -| -
+			;             (2)
+			;
+			; if this point is smaller than point 2 (midY), then the longest slope is at the top (inverse case)
 
-		MATH_MUL leftSpanX, totalSlopeX, FP_A	; optimise this later. no need to store in temp Q reg
-		;ldq FP_A ; Q should already contain correct value
-		clc
-		adcq leftY
-		cmpq midY
-		bmi plg_inverse
+			MATH_MUL leftSpanX, totalSlopeX, FP_A	; optimise this later. no need to store in temp Q reg
+			;ldq FP_A ; Q should already contain correct value
+			clc
+			adcq leftY
+			cmpq midY
+			bmi plg_inverse
 plg_noninverse:
-		lda #>slopebottom
-		sta pdlbot+2
-		lda #>slopetop
-		sta pdltop1+2
-		sta pdltop2+2
-		bra plg_checkend
+			lda #>slopebottom
+			sta pdlbot+2
+			lda #>slopetop
+			sta pdltop1+2
+			sta pdltop2+2
+			bra plg_checkend
 plg_inverse:		
-		lda #>slopetop
-		sta pdlbot+2
-		lda #>slopebottom
-		sta pdltop1+2
-		sta pdltop2+2		
+			lda #>slopetop
+			sta pdlbot+2
+			lda #>slopebottom
+			sta pdltop1+2
+			sta pdltop2+2		
 plg_checkend
 
 		; ----------------------------------------------- set up polygon
@@ -1008,458 +1007,427 @@ pdl3:
 ; ----------------------------------------------------------------------------------------------------
 
 flipflop
-		.byte 255
+			.byte 255
 
 .align 256
 
 irq1
-		pha
+			pha
 
-		;lda #$b0
-		;sta $d020
+			;lda #$b0
+			;sta $d020
 
-		jsr peppitoPlay
+			jsr peppitoPlay
 
-		jsr movescreen
+			jsr movescreen
 
-		;lda #$40
-		;sta $d020
+			;lda #$40
+			;sta $d020
 
-		lda flipflop
-		eor #$ff
-		sta flipflop
+			lda flipflop
+			eor #$ff
+			sta flipflop
 
-		bne :+
+			bne :+
 
-		lda #<.loword(screen1)							; show screen1, draw to screen2
-		sta $d060
-		lda #>.loword(screen1)
-		sta $d061
-		lda #<.hiword(screen1)
-		sta $d062
-		lda #>.hiword(screen1)
-		sta $d063
-		lda #((screenchars2 >> 16) & $0f) ; 3
-		sta linebuf
-		DMA_RUN_JOB clearpartialbitmapjob2
-		bra :++
+			lda #<.loword(screen1)							; show screen1, draw to screen2
+			sta $d060
+			lda #>.loword(screen1)
+			sta $d061
+			lda #<.hiword(screen1)
+			sta $d062
+			lda #>.hiword(screen1)
+			sta $d063
+			lda #((screenchars2 >> 16) & $0f) ; 3
+			sta linebuf
+			DMA_RUN_JOB clearpartialbitmapjob2
+			bra :++
 
-:		lda #<.loword(screen2)							; show screen2, draw to screen1
-		sta $d060
-		lda #>.loword(screen2)
-		sta $d061
-		lda #<.hiword(screen2)
-		sta $d062
-		lda #>.hiword(screen2)
-		sta $d063
-		lda #((screenchars1 >> 16) & $0f) ; 2
-		sta linebuf
-		DMA_RUN_JOB clearpartialbitmapjob1
-
+:			lda #<.loword(screen2)							; show screen2, draw to screen1
+			sta $d060
+			lda #>.loword(screen2)
+			sta $d061
+			lda #<.hiword(screen2)
+			sta $d062
+			lda #>.hiword(screen2)
+			sta $d063
+			lda #((screenchars1 >> 16) & $0f) ; 2
+			sta linebuf
+			DMA_RUN_JOB clearpartialbitmapjob1
 :		
 
-		jsr calc_distance
+			jsr calc_distance
 
-		lda frame
-		sta angle+0
-		lda #$00
-		sta angle+1
+			lda frame
+			sta angle+0
+			lda #$00
+			sta angle+1
 
-		; multiply by 4 because sin/cos values are stored as 16.16 fixed point
-		asl angle+0
-		rol angle+1
-		asl angle+0
-		rol angle+1
+			; multiply by 4 because sin/cos values are stored as 16.16 fixed point
+			asl angle+0
+			rol angle+1
+			asl angle+0
+			rol angle+1
 
-		; feed angle in as value for sinx, siny, sinz
+			; feed angle in as value for sinx, siny, sinz
 
-		clc
-		lda angle+0
-		adc #<sin32
-		sta foo1+3		; +3 to skip LDQ (= NEG NEG LDA)
-		lda angle+1
-		adc #>sin32
-		sta foo1+4
+			clc
+			lda angle+0
+			adc #<sin32
+			sta foo1+3		; +3 to skip LDQ (= NEG NEG LDA)
+			lda angle+1
+			adc #>sin32
+			sta foo1+4
 
-		; feed angle in as value for sinx, siny, sinz
+			; feed angle in as value for sinx, siny, sinz
 
-		clc
-		lda angle+0
-		adc #<cos32
-		sta foo2+3		; +3 to skip LDQ (= NEG NEG LDA)
-		lda angle+1
-		adc #>cos32
-		sta foo2+4
+			clc
+			lda angle+0
+			adc #<cos32
+			sta foo2+3		; +3 to skip LDQ (= NEG NEG LDA)
+			lda angle+1
+			adc #>cos32
+			sta foo2+4
 
-foo1	ldq sin32
-		stq sx
-		stq sy
-		;ldq q0
-		stq sz
-foo2	ldq cos32
-		stq cx
-		stq cy
-		;ldq q1
-		stq cz
+foo1		ldq sin32
+			stq sx
+			stq sy
+			;ldq q0
+			stq sz
+foo2		ldq cos32
+			stq cx
+			stq cy
+			;ldq q1
+			stq cz
 
-		MATH_BUILD_ROTMAT
+			MATH_BUILD_ROTMAT
 
-		;lda #$b8
-		;sta $d020
+			;lda #$b8
+			;sta $d020
 
-		; ---------------------------- ROTATE POINTS
+			; ---------------------------- ROTATE POINTS
 
-		lda #<vertsx
-		sta vxptr+0
-		lda #>vertsx
-		sta vxptr+1
+			lda #<vertsx
+			sta vxptr+0
+			lda #>vertsx
+			sta vxptr+1
 
-		lda #<vertsy
-		sta vyptr+0
-		lda #>vertsy
-		sta vyptr+1
+			lda #<vertsy
+			sta vyptr+0
+			lda #>vertsy
+			sta vyptr+1
 
-		lda #<vertsz
-		sta vzptr+0
-		lda #>vertsz
-		sta vzptr+1
+			lda #<vertsz
+			sta vzptr+0
+			lda #>vertsz
+			sta vzptr+1
 
-		lda #$00
-rploop	sta vertindex
+			lda #$00
+rploop		sta vertindex
 
-		;inc $d020
+			;inc $d020
 
-		ldz vertindex
-		ldq (vxptr),z
-		stq sx
-		ldz vertindex
-		ldq (vyptr),z
-		stq sy
-		ldz vertindex
-		ldq (vzptr),z
-		stq sz
+			ldz vertindex
+			ldq (vxptr),z
+			stq sx
+			ldz vertindex
+			ldq (vyptr),z
+			stq sy
+			ldz vertindex
+			ldq (vzptr),z
+			stq sz
 
-		MATH_DOT sx, m11, sy, m12, sz, m13, t1, t2, t3, fx
-		MATH_DOT sx, m21, sy, m22, sz, m23, t1, t2, t3, fy
-		MATH_DOT sx, m31, sy, m32, sz, m33, t1, t2, t3, fz
+			MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
+			MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
+			MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
 
-		; take distance, sub z
-		ldq qdistance
-		sec
-		sbcq fz
-		stq fz
+			; take distance, sub z
+			ldq qdistance
+			sec
+			sbcq fz
+			stq fz
 
-		; multiply by factor
-		ldq q80
-		MATH_DIV q80, fz, fz
-		MATH_MUL fx, fz, fx
-		MATH_MUL fy, fz, fy
+			; multiply by factor
+			ldq q80
+			MATH_DIV q80, fz, fz
+			MATH_MUL fx, fz, fx
+			MATH_MUL fy, fz, fy
 
-		MATH_ADD fx, q100, fx
-		MATH_ADD fy, q100, fy
+			MATH_ADD fx, q100, fx
+			MATH_ADD fy, q100, fy
 
-		ldy vertindex
-		lda fx+2
-		sta vertsxconv+2,y
-		lda fx+3
-		sta vertsxconv+3,y
-		lda fy+2
-		sta vertsyconv+2,y
-		lda fy+3
-		sta vertsyconv+3,y
+			ldy vertindex
+			lda fx+2
+			sta vertsxconv+2,y
+			lda fx+3
+			sta vertsxconv+3,y
+			lda fy+2
+			sta vertsyconv+2,y
+			lda fy+3
+			sta vertsyconv+3,y
 
-		clc
-		lda vertindex
-		adc #$04
-		cmp #numverts*4
-		beq :+
-		jmp rploop
+			clc
+			lda vertindex
+			adc #$04
+			cmp #numverts*4
+			beq :+
+			jmp rploop
 :
 
-		;lda #$20
-		;sta $d020
+			;lda #$20
+			;sta $d020
 
-		; ---------------------------- DRAW POLYGONS
+			; ---------------------------- DRAW POLYGONS
 
-		lda #<vertsxconv
-		sta vxcptr+0
-		lda #>vertsxconv
-		sta vxcptr+1
+			lda #<vertsxconv
+			sta vxcptr+0
+			lda #>vertsxconv
+			sta vxcptr+1
 
-		lda #<vertsyconv
-		sta vycptr+0
-		lda #>vertsyconv
-		sta vycptr+1
+			lda #<vertsyconv
+			sta vycptr+0
+			lda #>vertsyconv
+			sta vycptr+1
 
-		lda #$00
-dploop	sta polyindex
+			lda #$00
+dploop		sta polyindex
 
-		;lda #$00
-		;sta $d020
+			;lda #$00
+			;sta $d020
 
-		ldx polyindex
-		ldz indicesp1,x
-		ldq (vxcptr),z
-		stq leftX
-		ldx polyindex
-		ldz indicesp1,x
-		ldq (vycptr),z
-		stq leftY
+			ldx polyindex
+			ldz indicesp1,x
+			ldq (vxcptr),z
+			stq leftX
+			ldx polyindex
+			ldz indicesp1,x
+			ldq (vycptr),z
+			stq leftY
 
-		ldx polyindex
-		ldz indicesp2,x
-		ldq (vxcptr),z
-		stq midX
-		ldx polyindex
-		ldz indicesp2,x
-		ldq (vycptr),z
-		stq midY
+			ldx polyindex
+			ldz indicesp2,x
+			ldq (vxcptr),z
+			stq midX
+			ldx polyindex
+			ldz indicesp2,x
+			ldq (vycptr),z
+			stq midY
 
-		ldx polyindex
-		ldz indicesp3,x
-		ldq (vxcptr),z
-		stq rightX
-		ldx polyindex
-		ldz indicesp3,x
-		ldq (vycptr),z
-		stq rightY
+			ldx polyindex
+			ldz indicesp3,x
+			ldq (vxcptr),z
+			stq rightX
+			ldx polyindex
+			ldz indicesp3,x
+			ldq (vycptr),z
+			stq rightY
 
-		ldq midY										; calculate winding order
-		sec
-		sbcq leftY
-		stq t1
+			ldq midY										; calculate winding order
+			sec
+			sbcq leftY
+			stq t1
 
-		ldq rightX
-		sec
-		sbcq midX
-		stq t2
+			ldq rightX
+			sec
+			sbcq midX
+			stq t2
 
-		ldq midX
-		sec
-		sbcq leftX
-		stq t3
+			ldq midX
+			sec
+			sbcq leftX
+			stq t3
 
-		ldq rightY
-		sec
-		sbcq midY
-		stq t4
+			ldq rightY
+			sec
+			sbcq midY
+			stq t4
 
-		MATH_MUL t1, t2, t5
-		MATH_MUL t3, t4, t6
-		MATH_SUB t5, t6, t1
+			MATH_MUL t1, t2, t5
+			MATH_MUL t3, t4, t6
+			MATH_SUB t5, t6, t1
 
-		bit t1+3
-        bmi :+
-		jmp skippolydraw
+			bit t1+3
+			bmi :+
+			jmp skippolydraw
 :
 
-		; ROTATE/LIGHT NORMALS/POLYS
+			; ROTATE/LIGHT NORMALS/POLYS
 
-		ldx polyindex							; get poly index
-		lda times4lo,x							; and multiply by 4
-		sta pilo
-		sta vxptr+0
-		sta vyptr+0
-		sta vzptr+0
-		lda times4hi,x
-		sta pihi
+			ldx polyindex							; get poly index
+			lda times4lo,x							; and multiply by 4
+			sta pilo
+			sta vxptr+0
+			sta vyptr+0
+			sta vzptr+0
+			lda times4hi,x
+			sta pihi
 
-		clc										; add normalsx address
-		;lda #<normalsx
-		;adc pilo
-		;sta vxptr+0
-		lda #>normalsx
-		adc pihi
-		sta vxptr+1
+			clc										; add normalsx address
+			;lda #<normalsx
+			;adc pilo
+			;sta vxptr+0
+			lda #>normalsx
+			adc pihi
+			sta vxptr+1
 
-		clc
-		;lda #<normalsy
-		;adc pilo
-		;sta vyptr+0
-		lda #>normalsy
-		adc pihi
-		sta vyptr+1
+			clc
+			;lda #<normalsy
+			;adc pilo
+			;sta vyptr+0
+			lda #>normalsy
+			adc pihi
+			sta vyptr+1
 
-		clc
-		;lda #<normalsz
-		;adc pilo
-		;sta vzptr+0
-		lda #>normalsz
-		adc pihi
-		sta vzptr+1
+			clc
+			;lda #<normalsz
+			;adc pilo
+			;sta vzptr+0
+			lda #>normalsz
+			adc pihi
+			sta vzptr+1
 
-		ldz #$00
-		ldq (vxptr),z
-		stq sx
-		ldz #$00
-		ldq (vyptr),z
-		stq sy
-		ldz #$00
-		ldq (vzptr),z
-		stq sz
+			ldz #$00
+			ldq (vxptr),z
+			stq sx
+			ldz #$00
+			ldq (vyptr),z
+			stq sy
+			ldz #$00
+			ldq (vzptr),z
+			stq sz
 
-		MATH_DOT sx, m11, sy, m12, sz, m13, t1, t2, t3, fx
-		MATH_DOT sx, m21, sy, m22, sz, m23, t1, t2, t3, fy
-		MATH_DOT sx, m31, sy, m32, sz, m33, t1, t2, t3, fz
+			MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
+			MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
+			MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
 
-		MATH_DOT fx, lightvec+0, fy, lightvec+4, fz, lightvec+8, t1, t2, t3, fx
+			MATH_DOT3 fx, lightvec+0, fy, lightvec+4, fz, lightvec+8, fx
 
-		MATH_MUL fx, q16, fx
+			MATH_MUL fx, q16, fx
 
-		ldx polyindex
-		sec
-		lda orgcol,x
-		sbc #$c0
-		asl
-		clc
-		adc fx+2
-		sta linecolour
+			ldx polyindex
+			sec
+			lda orgcol,x
+			sbc #$c0
+			asl
+			clc
+			adc fx+2
+			sta linecolour
 
-		jsr drawpoly
-		;lda #0
-		;sta $d020
+			jsr drawpoly
+			;lda #0
+			;sta $d020
 
 skippolydraw
 
-		clc
-		lda polyindex
-		adc #$01
-		cmp #numpolies
-		beq :+
-		jmp dploop
+			clc
+			lda polyindex
+			adc #$01
+			cmp #numpolies
+			beq :+
+			jmp dploop
 :
 
-		ldx #$00
-		stx $d020
+			ldx #$00
+			stx $d020
 
-		inc frame
+			inc frame
 
-		pla
-		asl $d019
-		rti
+			pla
+			asl $d019
+			rti
 
 calc_distance
-		lda #$00
-		sta qdistance+0
-		sta qdistance+1
-		sta qdistance+2
-		sta qdistance+3
+			lda #$00
+			sta qdistance+0
+			sta qdistance+1
+			sta qdistance+2
+			sta qdistance+3
 
-		ldx frame
-		lda sine,x
-		lsr ; put into 0-128 range
-		sta qdistance+2
-		; divide by 32
-		MATH_DIV qdistance, q32, qdistance
-		clc
-		lda qdistance+2
-		adc #$04
-		sta qdistance+2
-		rts
+			ldx frame
+			lda sine,x
+			lsr ; put into 0-128 range
+			sta qdistance+2
+			; divide by 32
+			MATH_DIV qdistance, q32, qdistance
+			clc
+			lda qdistance+2
+			adc #$04
+			sta qdistance+2
+			rts
 
-.align 256
-
-frame
-		.byte $00
-
-angle
-		.word $00
-
-screenrow
-		.byte 0
-
-screencolumn
-		.byte 0
-
-vertindex
-		.byte 0
-
-normalindex
-		.byte 0
-
-polyindex
-		.byte 0
-
-pilo
-		.byte 0
-
-pihi
-		.byte 0
-
-rrbxpos	.byte 0
-
+; ----------------------------------------------------------------------------------------------------
 
 movescreen
 
-		ldx frame
-		lda rrbsine,x
-		sta rrbxpos
+			ldx frame
+			lda rrbsine,x
+			sta rrbxpos
 
-		; set up scr and col ptrs
-		lda #<.loword(SAFE_COLOR_RAM+0*160+40*2)
-		sta colptr+0
-		lda #>.loword(SAFE_COLOR_RAM+0*160+40*2)
-		sta colptr+1
-		lda #<.hiword(SAFE_COLOR_RAM+0*160+40*2)
-		sta colptr+2
-		lda #>.hiword(SAFE_COLOR_RAM+0*160+40*2)
-		sta colptr+3
+			; set up scr and col ptrs
+			lda #<.loword(SAFE_COLOR_RAM+0*160+40*2)
+			sta colptr+0
+			lda #>.loword(SAFE_COLOR_RAM+0*160+40*2)
+			sta colptr+1
+			lda #<.hiword(SAFE_COLOR_RAM+0*160+40*2)
+			sta colptr+2
+			lda #>.hiword(SAFE_COLOR_RAM+0*160+40*2)
+			sta colptr+3
 
-		lda #<.loword(screen1+0*160+40*2)
-		sta scrptr1+0
-		lda #>.loword(screen1+0*160+40*2)
-		sta scrptr1+1
-		lda #<.hiword(screen1+0*160+40*2)
-		sta scrptr1+2
-		lda #>.hiword(screen1+0*160+40*2)
-		sta scrptr1+3
+			lda #<.loword(screen1+0*160+40*2)
+			sta scrptr1+0
+			lda #>.loword(screen1+0*160+40*2)
+			sta scrptr1+1
+			lda #<.hiword(screen1+0*160+40*2)
+			sta scrptr1+2
+			lda #>.hiword(screen1+0*160+40*2)
+			sta scrptr1+3
 
-		lda #<.loword(screen2+0*160+40*2)
-		sta scrptr2+0
-		lda #>.loword(screen2+0*160+40*2)
-		sta scrptr2+1
-		lda #<.hiword(screen2+0*160+40*2)
-		sta scrptr2+2
-		lda #>.hiword(screen2+0*160+40*2)
-		sta scrptr2+3
+			lda #<.loword(screen2+0*160+40*2)
+			sta scrptr2+0
+			lda #>.loword(screen2+0*160+40*2)
+			sta scrptr2+1
+			lda #<.hiword(screen2+0*160+40*2)
+			sta scrptr2+2
+			lda #>.hiword(screen2+0*160+40*2)
+			sta scrptr2+3
 
-		; ----------------------------------------- set up gotox attribs
+			; ----------------------------------------- set up gotox attribs
 
-		ldx #0
+			ldx #0
 setatrbs2
-		ldz #0
-		lda rrbxpos
-		sta [scrptr1],z
-		sta [scrptr2],z
-		inz
-		lda #0
-		sta [scrptr1],z
-		sta [scrptr2],z
+			ldz #0
+			lda rrbxpos
+			sta [scrptr1],z
+			sta [scrptr2],z
+			inz
+			lda #0
+			sta [scrptr1],z
+			sta [scrptr2],z
 
-		clc
-		lda scrptr1+0
-		adc #<160
-		sta scrptr1+0
-		lda scrptr1+1
-		adc #>160
-		sta scrptr1+1
+			clc
+			lda scrptr1+0
+			adc #<160
+			sta scrptr1+0
+			lda scrptr1+1
+			adc #>160
+			sta scrptr1+1
 
-		clc
-		lda scrptr2+0
-		adc #<160
-		sta scrptr2+0
-		lda scrptr2+1
-		adc #>160
-		sta scrptr2+1
+			clc
+			lda scrptr2+0
+			adc #<160
+			sta scrptr2+0
+			lda scrptr2+1
+			adc #>160
+			sta scrptr2+1
 
-		inx
-		cpx #25
-		beq endsetatrbt2
-		jmp setatrbs2
+			inx
+			cpx #25
+			beq endsetatrbt2
+			jmp setatrbs2
 
 endsetatrbt2
 
-		rts
+			rts
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -1815,6 +1783,17 @@ dstcolumnhi
 		.repeat 64, I
 			.byte >((I*25*64) + 0), >((I*25*64) + 1), >((I*25*64) + 2), >((I*25*64) + 3), >((I*25*64) + 4), >((I*25*64) + 5), >((I*25*64) + 6), >((I*25*64) + 7)
 		.endrepeat
+
+frame			.byte $00
+angle			.word $00
+screenrow		.byte 0
+screencolumn	.byte 0
+vertindex		.byte 0
+normalindex		.byte 0
+polyindex		.byte 0
+pilo			.byte 0
+pihi			.byte 0
+rrbxpos			.byte 0
 
 verticalcenter	.word 0
 

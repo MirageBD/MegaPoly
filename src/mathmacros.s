@@ -72,6 +72,15 @@
         stq to
 .endmacro
 
+.macro MATH_NEG_DIRECT from
+		lda #0
+		tax
+		tay
+		taz
+		sec
+		sbcq from
+.endmacro
+
 .macro MATH_ABS from, to
 .scope
         bit from+3
@@ -116,15 +125,13 @@ end
 .endscope
 .endmacro
 
-.macro MATH_DOT px, m1, py, m2, pz, m3, tmp1, tmp2, tmp3, output
-		MATH_MUL px, m1, tmp1
-		MATH_MUL py, m2, tmp2
-		MATH_MUL pz, m3, tmp3
-
+.macro MATH_DOT3 px, m1, py, m2, pz, m3, output
+		MATH_MUL pz, m3, t2
+		MATH_MUL py, m2, t1
+		MATH_MUL_DIRECT px, m1
 		clc
-		ldq tmp1
-		adcq tmp2
-		adcq tmp3
+		adcq t1
+		adcq t2
 		stq output
 .endmacro
 
@@ -135,9 +142,9 @@ end
 
 		; optimize this? sx * m11, * m21, * m31, etc.
 
-		MATH_DOT sx, m11, sy, m12, sz, m13, t1, t2, t3, fx
-		MATH_DOT sx, m21, sy, m22, sz, m23, t1, t2, t3, fy
-		MATH_DOT sx, m31, sy, m32, sz, m33, t1, t2, t3, fz
+		MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
+		MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
+		MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
 .endmacro
 
 .macro MATH_DIV numerator, denominator, result
@@ -181,6 +188,33 @@ posb2:			MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive r
 negresult:		MATH_NEG MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
 				bra end
 posresult:		MATH_MOV MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
+end:
+.endscope
+.endmacro
+
+.macro MATH_MUL_DIRECT	opA, opB
+.scope
+						bit opA+3
+						bpl posa
+						MATH_NEG opA, MULTINA			; a is negative
+nega:					bit opB+3
+						bpl posb1
+						MATH_NEG opB, MULTINB			; a is negative, b is negative - use positive result
+						bra posresult
+posb1:					MATH_MOV opB, MULTINB			; a is negative, b is positive - use negative result
+						bra negresult
+
+posa:					MATH_MOV opA, MULTINA			; a is positive
+						bit opB+3
+						bpl posb2
+						MATH_NEG opB, MULTINB			; a is positive, b is negative - use negative result
+						bra negresult
+posb2:					MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
+						bra posresult
+
+negresult:				MATH_NEG_DIRECT MULTOUT+2		; add 2 to get new 16.16 fixed point result
+						bra end
+posresult:				ldq MULTOUT+2					; add 2 to get new 16.16 fixed point result
 end:
 .endscope
 .endmacro
