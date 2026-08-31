@@ -15,5 +15,7 @@ filebuffer = $0200
 .include "decruncher.s"
 .include "iffl.s"
 .include "modplay.s"
+.include "model.s"
+.include "rasterize.s"
 
 ; ----------------------------------------------------------------------------------------------------
