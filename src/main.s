@@ -920,23 +920,23 @@ dploop		sta polyindex
 			ldq (vycptr),z
 			stq rightY
 
-			ldq midY										; calculate winding order
 			sec
+			ldq midY										; calculate winding order
 			sbcq leftY
 			stq t1
 
-			ldq rightX
 			sec
+			ldq rightX
 			sbcq midX
 			stq t2
 
-			ldq midX
 			sec
+			ldq midX
 			sbcq leftX
 			stq t3
 
-			ldq rightY
 			sec
+			ldq rightY
 			sbcq midY
 			stq t4
 
@@ -945,9 +945,10 @@ dploop		sta polyindex
 			MATH_SUB t5, t6, t1
 
 			bit t1+3
-			bmi :+
+			bmi not_backface_culled
 			jmp skippolydraw
-:
+
+not_backface_culled:
 
 			; ROTATE/LIGHT NORMALS/POLYS
 
@@ -960,26 +961,17 @@ dploop		sta polyindex
 			lda times4hi,x
 			sta pihi
 
-			clc										; add normalsx address
-			;lda #<normalsx
-			;adc pilo
-			;sta vxptr+0
+			clc										; add normals addresses. needs to be page aligned
 			lda #>normalsx
 			adc pihi
 			sta vxptr+1
 
 			clc
-			;lda #<normalsy
-			;adc pilo
-			;sta vyptr+0
 			lda #>normalsy
 			adc pihi
 			sta vyptr+1
 
 			clc
-			;lda #<normalsz
-			;adc pilo
-			;sta vzptr+0
 			lda #>normalsz
 			adc pihi
 			sta vzptr+1
@@ -1011,7 +1003,7 @@ dploop		sta polyindex
 			adc fx+2
 			sta linecolour
 
-			jsr drawpoly
+			jsr rasterizepoly
 			;lda #0
 			;sta $d020
 
@@ -1180,7 +1172,6 @@ clearcolorramjob
 ; -------------------------------------------------------------------------------------------------
 
 clearpartialbitmapjob1
-				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
 				.byte $0a ; Request format is F018A
 				;.byte $80, (bmpchars >> 20) ; sourcebank
@@ -1204,7 +1195,6 @@ clearpartialbitmapjob1
 				.byte ((screenchars1 >> 16) & $0f)
 
 clearpartialbitmapjob2
-				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
 				.byte $0a ; Request format is F018A
 				;.byte $80, (bmpchars >> 20) ; sourcebank
@@ -1230,7 +1220,6 @@ clearpartialbitmapjob2
 ; -------------------------------------------------------------------------------------------------
 
 cleare000
-				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
 				.byte $0a ; Request format is F018A
 				;.byte $80, (bmpchars >> 20) ; sourcebank
@@ -1447,28 +1436,6 @@ rrbxpos			.byte 0
 verticalcenter	.word 0
 
 ;columnhi:		.byte $00
-
-leftX			.byte $00, $00, $00, $00
-leftY			.byte $00, $00, $00, $00
-
-midX			.byte $00, $00, $00, $00
-midY			.byte $00, $00, $00, $00
-
-rightX			.byte $00, $00, $00, $00
-rightY			.byte $00, $00, $00, $00
-
-midXEnd			.byte $00, $00, $00, $00
-rightXEnd		.byte $00, $00, $00, $00
-
-leftSpanX		.byte $00, $00, $00, $00
-rightSpanX		.byte $00, $00, $00, $00
-totalSpanX		.byte $00, $00, $00, $00
-
-leftSpanY		.byte $00, $00, $00, $00
-rightSpanY		.byte $00, $00, $00, $00
-totalSpanY		.byte $00, $00, $00, $00
-
-totalSlopeY		.byte $00, $00, $00, $00
 
 q0				.byte $00, $00, $00, $00
 q1				.byte $00, $00, $01, $00

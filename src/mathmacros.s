@@ -165,6 +165,20 @@ end:
 .endscope
 .endmacro
 
+.macro MATH_DIV_BPOS numerator, denominator, result
+.scope
+						MATH_ABS numerator, MULTINA
+						MATH_MOV denominator, MULTINB
+						bit numerator+3
+						bmi negtivea					; a is negative and b is positive - use negative result
+						bra postivea					; a is positive and so is b - use positive result
+negtivea:				MATH_NEG DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point result
+						bra end
+postivea:				MATH_MOV DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point result
+end:
+.endscope
+.endmacro
+
 .macro MATH_MUL opA, opB, result
 .scope
 				bit opA+3

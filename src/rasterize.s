@@ -7,49 +7,38 @@
 		stq that
 .endmacro		
 
-.macro GENERATE_SLOPE_TABLE_NONCLIPPED startx, starty, spanx, spany, delta, destinationhi, destinationlo
+.macro GENERATE_SLOPE_TABLE_NONCLIPPED starty, spanx, spany, delta, destinationlo
 .scope
-					lda spanx+3										; test if span == 0
-					beq span_couldbe0
-					bra span_biggerthan256							; not zero, continue
-span_couldbe0:		lda spanx+2
-					beq span_skip									; high AND low span both 0 -> skip rendering
-span_biggerthan256:	lda spanx+2
-					sta dma_slpcount+0
-					lda spanx+3
-					sta dma_slpcount+1
+					lda spanx+2
+					beq span_skip									; span 0 -> skip rendering
 
+					sta dma_slpcount+0
 					lda starty+2									; Y start
 					sta dma_slpsadr+0
-					;lda starty+1									; Y start fraction
-					;sta dma_slpsadrfrac+1
 					clc
 					lda destinationlo								; put Y numbers at xxyy
-					adc startx+2
+					adc leftX+2
 					sta dma_slpdadr+0
-					lda destinationhi								; put Y numbers at xxyy
-					;adc startx+3
-					sta dma_slpdadr+1
 
 					bit spany+3										; if Y span negative, then set DMA to render in reverse direction (and negate delta to start in reverse order)
 					bmi span_negative
-;span_positive:
+
+span_positive:		lda #%00000000									; positive DMA copy
+					sta dma_slpdir
 					lda delta+1										; Y/X delta low
 					sta dma_slpsskiplo+1
 					lda delta+2										; Y/X delta high
 					sta dma_slpsskiphi+1
-					lda #%00000000									; positive DMA copy
-					sta dma_slpdir
 					bra span_finalise
-span_negative:
+
+span_negative:		lda #%00010000									; negative DMA copy
+					sta dma_slpdir
 					lda delta+1										; negative Y/X delta low
 					eor #$ff
 					sta dma_slpsskiplo+1
 					lda delta+2										; negative Y/X delta low
 					eor #$ff
 					sta dma_slpsskiphi+1
-					lda #%00010000									; negative DMA copy
-					sta dma_slpdir
 					;jmp span_finalise
 
 span_finalise:		jsr dma_plot_slope
@@ -87,7 +76,7 @@ dma_slpdadr:		.word slopetop							; dst
 
 ; ----------------------------------------------------------------------------------------------------
 
-drawpoly
+rasterizepoly:
 
 			lda linecolour
 			lsr
@@ -95,7 +84,7 @@ drawpoly
 			adc #$c0
 			sta $d020
 
-			; ----------------------------------------------- swap points if needed
+			; ----------------------------------------------- swap points if needed, sorting points from left to right
 
 			lda leftX+2
 			cmp midX+2
@@ -113,7 +102,7 @@ drawpoly
 			SWAP midX, rightX
 			SWAP midY, rightY
 :
-			; ----------------------------------------------- calculate X spans
+			; ----------------------------------------------- calculate X spans. these are always positive, so can do simpler Accumulator subtract
 
 			sec
 			lda midX+2
@@ -128,7 +117,7 @@ drawpoly
 			sbc leftX+2
 			sta totalSpanX+2 ; return here if total == 0 ?
 
-			; ----------------------------------------------- calculate Y spans
+			; ----------------------------------------------- calculate Y spans. these can be negaive, so do full Q subtract
 
 			sec	
 			ldq midY
@@ -145,16 +134,19 @@ drawpoly
 
 			; ----------------------------------------------- calculate deltas
 
-			MATH_DIV leftSpanY,  leftSpanX,  leftSlopeX
-			MATH_DIV rightSpanY, rightSpanX, rightSlopeX
-			MATH_DIV totalSpanY, totalSpanX, totalSlopeX
+			MATH_DIV_BPOS leftSpanY,  leftSpanX,  leftSlopeX
+			MATH_DIV_BPOS rightSpanY, rightSpanX, rightSlopeX
+			MATH_DIV_BPOS totalSpanY, totalSpanX, totalSlopeX
 
 			; ----------------------------------------------- DMA plot slopes
 
-			MATH_DIV totalSpanX, totalSpanY, totalSlopeY
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #>slopetop,    #0					; partial span left
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftX,  midY, rightSpanX, rightSpanY, rightSlopeX, #>slopetop,    leftSpanX+2		; partial span right
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX, #>slopebottom, #0					; total span
+			lda #>slopetop
+			sta dma_slpdadr+1
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #0				; partial span left
+			GENERATE_SLOPE_TABLE_NONCLIPPED  midY, rightSpanX, rightSpanY, rightSlopeX, leftSpanX+2		; partial span right
+			lda #>slopebottom
+			sta dma_slpdadr+1
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftY, totalSpanX, totalSpanY, totalSlopeX, #0				; total span
 
 			; check if we're inverted (I.E. longest slope is running at the top)
 			; (leftY + leftspanX * totalSlopeX) is this point (*):
@@ -229,10 +221,9 @@ polygon_setup:
 
 			ldq q0												; get ready to multiply stuff by 8 in inner loop
 			stq MULTINA
+			stq MULTINB
 			lda #8
 			sta MULTINA+0
-			ldq q0
-			stq MULTINB
 
 polygon_draw_loop:
 
@@ -262,13 +253,13 @@ pdlpos:		bne pdl2											; continue if not 0
 			bra pdl3											; otherwise skip span
 pdl2:		sta linesize+0
 
+			clc
 pdltop2:	ldy $ff00
 			sty MULTINB+0
-			clc
 			lda MULTOUT+0 ; times8lo,y
 pdlcollo:	adc dstcolumnlo
 			sta linestart+0
-			lda MULTOUT+1; times8hi,y
+			lda MULTOUT+1 ; times8hi,y
 pdl9:		adc dstcolumnhi
 			sta linestart+1
 
@@ -297,13 +288,33 @@ pdl3:
 			sta pdltop2+1
 			sta pdlcollo+1
 			sta pdl9+1
-			bne polygon_draw_loop2	; if we've crossed the 256 (when the screen is 320 wide, which it's not) boundary then increase columnhi and stuff
+			;bne polygon_draw_loop2	; if we've crossed the 256 (when the screen is 320 wide, which it's not) boundary then increase columnhi and stuff
+			bra polygon_draw_loop2	; if we've crossed the 256 (when the screen is 320 wide, which it's not) boundary then increase columnhi and stuff
 ;			inc pdlbot+2
 ;			inc pdltop1+2
 ;			inc pdltop2+2
 ;			inc pdlcollo+2
 ;			inc pdl9+2
 ;			inc columnhi
-;pdl7:		bra polygon_draw_loop
+;			bra polygon_draw_loop
 
 ; ----------------------------------------------------------------------------------------------------
+
+.align 4
+
+leftX			.byte $00, $00, $00, $00
+leftY			.byte $00, $00, $00, $00
+
+midX			.byte $00, $00, $00, $00
+midY			.byte $00, $00, $00, $00
+
+rightX			.byte $00, $00, $00, $00
+rightY			.byte $00, $00, $00, $00
+
+leftSpanX		.byte $00, $00, $00, $00
+rightSpanX		.byte $00, $00, $00, $00
+totalSpanX		.byte $00, $00, $00, $00
+
+leftSpanY		.byte $00, $00, $00, $00
+rightSpanY		.byte $00, $00, $00, $00
+totalSpanY		.byte $00, $00, $00, $00
