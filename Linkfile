@@ -7,4 +7,5 @@ SEGMENTS
 {
 	MAIN:			load=RAM, start=$2100;
 	TABLES:         load=RAM, align=256;
+	RASTERIZE:		load=RAM, start=$c000;
 }

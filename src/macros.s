@@ -1,6 +1,5 @@
 .define COLOR_RAM $ff80000
 .define SAFE_COLOR_RAM COLOR_RAM+2048
-.define SAFE_COLOR_RAM_PLUS_ONE COLOR_RAM+2048+1
 
 .define COLOR_RAM_FREESPACE COLOR_RAM+2048+8192
 
@@ -41,24 +40,6 @@ FileName	.byte .sprintf("%s", fname), 0
 			sta iffl_unpackaddress+3
 			
 			jsr iffl_loadanddecrunchnextfile
-.endscope
-.endmacro
-
-.macro FLOPPY_FAST_LOAD addr, char1, char2
-.scope
-			lda #<.loword(addr)
-			sta fastload_address+0
-			lda #>.loword(addr)
-			sta fastload_address+1
-			lda #<.hiword(addr)
-			sta fastload_address+2
-			lda #>.hiword(addr)
-			sta fastload_address+3
-
-			ldx #char1
-			ldy #char2
-			jsr fl_find_dir_entry
-			jsr fl_waiting
 .endscope
 .endmacro
 

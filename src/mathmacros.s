@@ -135,18 +135,6 @@ end
 		stq output
 .endmacro
 
-.macro MATH_MUL_VEC_MAT
-		;p2.x = p.x * mXYZ.m11 + p.y * mXYZ.m12 + p.z * mXYZ.m13;
-        ;p2.y = p.x * mXYZ.m21 + p.y * mXYZ.m22 + p.z * mXYZ.m23;
-        ;p2.z = p.x * mXYZ.m31 + p.y * mXYZ.m32 + p.z * mXYZ.m33;
-
-		; optimize this? sx * m11, * m21, * m31, etc.
-
-		MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
-		MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
-		MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
-.endmacro
-
 .macro MATH_DIV numerator, denominator, result
 .scope
 						MATH_ABS numerator, MULTINA

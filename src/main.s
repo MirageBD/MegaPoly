@@ -1,7 +1,7 @@
 .define emptychar		$ff80							; size = 64
 
-.define palette			$c000
-.define altpalette		$c800
+.define palette			$ca00
+.define altpalette		$cd00
 
 .define screen1			$e000	; 40*25*2 = $0800      ; 80*25*2 = $1000
 .define screen2			$f000
@@ -156,8 +156,8 @@ entry_main
 		jsr fl_waiting
 		FLOPPY_IFFL_FAST_LOAD_INIT "MEGAPLY.IFFLCRCH"
 		FLOPPY_IFFL_FAST_LOAD_ADDRESS $00010000
-		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000c000
-		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000c800
+		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000ca00
+		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000cd00
 		FLOPPY_IFFL_FAST_LOAD_ADDRESS $00040000
 
 		jsr fl_exit
@@ -992,13 +992,12 @@ not_backface_culled:
 
 			MATH_DOT3 fx, lightvec+0, fy, lightvec+4, fz, lightvec+8, fx
 
-			MATH_MUL fx, q16, fx
+			MATH_MUL fx, qlightmult, fx
+			MATH_ADD fx, qlightadd, fx
 
 			ldx polyindex
-			sec
-			lda orgcol,x
-			sbc #$c0
-			asl
+			ldy orgcol,x
+			lda colorremap,y
 			clc
 			adc fx+2
 			sta linecolour
@@ -1387,29 +1386,24 @@ lineartable
 slopetop
 .repeat 256
 		.byte 0
-.endrepeat		
+.endrepeat
 
 slopebottom
 .repeat 256
 		.byte 0
-.endrepeat		
+.endrepeat
 
 vertsxconv
 .repeat 256
-		.byte $00
+		.byte 0
 .endrepeat
 
 vertsyconv
 .repeat 256
-		.byte $00
+		.byte 0
 .endrepeat
 
 .align 256
-
-litcol
-.repeat 256
-		.byte $40
-.endrepeat
 
 dstcolumnlo
 		.repeat 64, I
@@ -1427,7 +1421,6 @@ angle			.word 0
 screenrow		.byte 0
 screencolumn	.byte 0
 vertindex		.byte 0
-normalindex		.byte 0
 polyindex		.byte 0
 pilo			.byte 0
 pihi			.byte 0
@@ -1435,15 +1428,19 @@ rrbxpos			.byte 0
 
 verticalcenter	.word 0
 
-;columnhi:		.byte $00
-
 q0				.byte $00, $00, $00, $00
-q1				.byte $00, $00, $01, $00
-q16				.byte $00, $00, $3e, $00
 q32				.byte $00, $00, $20, $00
 q80				.byte $00, $00, $c0, $00
 q100			.byte $00, $00, $60, $00
 
+qlightadd		.byte $00, $00, $10, $00
+qlightmult		.byte $00, $00, $2e, $00
+
 qdistance		.byte $00, $00, $08, $00
 
-lightvec		.byte $00, $00, $00 ,$00,    $00, $00, $00, $00,    $00, $00, $01, $00
+lightvec		.byte $00, $80, $ff, $ff,    $00, $00, $00 ,$00,    $00, $e0, $00, $00
+
+colorremap		.byte $00, $40
+
+; x = 00 00 ff ff = light comes from left
+; z = 00 00 01 00 = light comes from front
