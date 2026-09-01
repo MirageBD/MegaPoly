@@ -16,6 +16,7 @@ filebuffer = $0200
 .include "iffl.s"
 .include "modplay.s"
 .include "model.s"
+.include "camera.s"
 .include "polygon.s"
 .include "rasterize.s"
 
