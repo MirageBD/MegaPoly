@@ -25,657 +25,656 @@
 
 entry_main
 
-		sei
+			sei
 
-		lda #$35
-		sta $01
+			lda #$35
+			sta $01
 
-		lda #%10000000									; Clear bit 7 - HOTREG
-		trb $d05d
+			lda #%10000000									; Clear bit 7 - HOTREG
+			trb $d05d
 
-		lda #$00										; unmap
-		tax
-		tay
-		taz
-		map
-		eom
+			lda #$00										; unmap
+			tax
+			tay
+			taz
+			map
+			eom
 
-		lda #$47										; enable C65GS/VIC-IV IO registers
-		sta $d02f
-		lda #$53
-		sta $d02f
-		eom
+			lda #$47										; enable C65GS/VIC-IV IO registers
+			sta $d02f
+			lda #$53
+			sta $d02f
+			eom
 
-		lda #%10000000									; force PAL mode, because I can't be bothered with fixing it for NTSC
-		trb $d06f										; clear bit 7 for PAL ; trb $d06f 
-		;tsb $d06f										; set bit 7 for NTSC  ; tsb $d06f
+			lda #%10000000									; force PAL mode, because I can't be bothered with fixing it for NTSC
+			trb $d06f										; clear bit 7 for PAL ; trb $d06f 
+			;tsb $d06f										; set bit 7 for NTSC  ; tsb $d06f
 
-		lda #$41										; enable 40MHz
-		sta $00
+			lda #$41										; enable 40MHz
+			sta $00
 
-		;lda #$70										; Disable C65 rom protection using hypervisor trap (see mega65 manual)
-		;sta $d640
-		;eom
+			;lda #$70										; Disable C65 rom protection using hypervisor trap (see mega65 manual)
+			;sta $d640
+			;eom
 
-		lda #%11111000									; unmap c65 roms $d030 by clearing bits 3-7
-		trb $d030
+			lda #%11111000									; unmap c65 roms $d030 by clearing bits 3-7
+			trb $d030
 
-		lda #$05										; enable Super-Extended Attribute Mode by asserting the FCLRHI and CHR16 signals - set bits 2 and 0 of $D054.
-		sta $d054
+			lda #$05										; enable Super-Extended Attribute Mode by asserting the FCLRHI and CHR16 signals - set bits 2 and 0 of $D054.
+			sta $d054
 
-		lda #%10100000									; CLEAR bit7=40 column, bit5=Enable extended attributes and 8 bit colour entries
-		trb $d031
+			lda #%10100000									; CLEAR bit7=40 column, bit5=Enable extended attributes and 8 bit colour entries
+			trb $d031
 
-		lda #40*2										; logical chars per row
-		sta $d058
-		lda #$00
-		sta $d059
+			lda #40*2										; logical chars per row
+			sta $d058
+			lda #$00
+			sta $d059
 
-		ldx #$00
-		lda #$00
-:		sta emptychar,x
-		inx
-		cpx #64
-		bne :-
+			ldx #$00
+			lda #$00
+:			sta emptychar,x
+			inx
+			cpx #64
+			bne :-
 
-		ldx #$00
-:		lda #<(emptychar/64)
-		sta screen1+0*$0100+0,x
-		sta screen1+1*$0100+0,x
-		sta screen1+2*$0100+0,x
-		sta screen1+3*$0100+0,x
-		sta screen1+4*$0100+0,x
-		sta screen1+5*$0100+0,x
-		sta screen1+6*$0100+0,x
-		sta screen1+7*$0100+0,x
-		lda #>(emptychar/64)
-		sta screen1+0*$0100+1,x
-		sta screen1+1*$0100+1,x
-		sta screen1+2*$0100+1,x
-		sta screen1+3*$0100+1,x
-		sta screen1+4*$0100+1,x
-		sta screen1+5*$0100+1,x
-		sta screen1+6*$0100+1,x
-		sta screen1+7*$0100+1,x
-		inx
-		inx
-		bne :-
+			ldx #$00
+:			lda #<(emptychar/64)
+			sta screen1+0*$0100+0,x
+			sta screen1+1*$0100+0,x
+			sta screen1+2*$0100+0,x
+			sta screen1+3*$0100+0,x
+			sta screen1+4*$0100+0,x
+			sta screen1+5*$0100+0,x
+			sta screen1+6*$0100+0,x
+			sta screen1+7*$0100+0,x
+			lda #>(emptychar/64)
+			sta screen1+0*$0100+1,x
+			sta screen1+1*$0100+1,x
+			sta screen1+2*$0100+1,x
+			sta screen1+3*$0100+1,x
+			sta screen1+4*$0100+1,x
+			sta screen1+5*$0100+1,x
+			sta screen1+6*$0100+1,x
+			sta screen1+7*$0100+1,x
+			inx
+			inx
+			bne :-
 
-		DMA_RUN_JOB clearcolorramjob
+			DMA_RUN_JOB clearcolorramjob
 
-		lda #<.loword(screen1)							; set pointer to screen ram
-		sta $d060
-		lda #>.loword(screen1)
-		sta $d061
-		lda #<.hiword(screen1)
-		sta $d062
-		lda #>.hiword(screen1)
-		sta $d063
+			lda #<.loword(screen1)							; set pointer to screen ram
+			sta $d060
+			lda #>.loword(screen1)
+			sta $d061
+			lda #<.hiword(screen1)
+			sta $d062
+			lda #>.hiword(screen1)
+			sta $d063
 
-		lda #<$0800										; set (offset!) pointer to colour ram
-		sta $d064
-		lda #>$0800
-		sta $d065
+			lda #<$0800										; set (offset!) pointer to colour ram
+			sta $d064
+			lda #>$0800
+			sta $d065
 
-		lda #$7f										; disable CIA interrupts
-		sta $dc0d
-		sta $dd0d
-		lda $dc0d
-		lda $dd0d
+			lda #$7f										; disable CIA interrupts
+			sta $dc0d
+			sta $dd0d
+			lda $dc0d
+			lda $dd0d
 
-		lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
-		sta $d01a
+			lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
+			sta $d01a
 
-		lda #$00
-		sta $d012
-		lda #<fastload_irq_handler
-		sta $fffe
-		lda #>fastload_irq_handler
-		sta $ffff
+			lda #$00
+			sta $d012
+			lda #<fastload_irq_handler
+			sta $fffe
+			lda #>fastload_irq_handler
+			sta $ffff
 
-		lda #$01										; ACK
-		sta $d01a
+			lda #$01										; ACK
+			sta $d01a
 
-		cli
+			cli
 
-		jsr fl_init
-		jsr fl_waiting
-		FLOPPY_IFFL_FAST_LOAD_INIT "MEGAPLY.IFFLCRCH"
-		FLOPPY_IFFL_FAST_LOAD_ADDRESS $00010000
-		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000ca00
-		FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000cd00
-		FLOPPY_IFFL_FAST_LOAD_ADDRESS $00040000
+			jsr fl_init
+			jsr fl_waiting
+			FLOPPY_IFFL_FAST_LOAD_INIT "MEGAPLY.IFFLCRCH"
+			FLOPPY_IFFL_FAST_LOAD_ADDRESS $00010000
+			FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000ca00
+			FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000cd00
+			FLOPPY_IFFL_FAST_LOAD_ADDRESS $00040000
 
-		jsr fl_exit
+			jsr fl_exit
 
-		sei
+			sei
 
-		lda #$35
-		sta $01
+			lda #$35
+			sta $01
 
-		lda #<.loword(moddata)
-		sta adrPepMODL+0
-		lda #>.loword(moddata)
-		sta adrPepMODL+1
-		lda #<.hiword(moddata)
-		sta adrPepMODH+0
-		lda #>.hiword(moddata)
-		sta adrPepMODH+1
+			lda #<.loword(moddata)
+			sta adrPepMODL+0
+			lda #>.loword(moddata)
+			sta adrPepMODL+1
+			lda #<.hiword(moddata)
+			sta adrPepMODH+0
+			lda #>.hiword(moddata)
+			sta adrPepMODH+1
 
-		jsr peppitoInit
+			jsr peppitoInit
 
-		lda #$00
-		sta $d020
-		sta $d021
+			lda #$00
+			sta $d020
+			sta $d021
 
-		lda #$05										; enable Super-Extended Attribute Mode by asserting the FCLRHI and CHR16 signals - set bits 2 and 0 of $D054.
-		sta $d054
+			lda #$05										; enable Super-Extended Attribute Mode by asserting the FCLRHI and CHR16 signals - set bits 2 and 0 of $D054.
+			sta $d054
 
-		lda #%10100000									; Clear bit7=40 column, bit5=disable ...?
-		trb $d031
+			lda #%10100000									; Clear bit7=40 column, bit5=disable ...?
+			trb $d031
 
-		lda #%00100000									; set bit 5 to enable multicolour mode, needed for alt palette
-		tsb $d031
+			lda #%00100000									; set bit 5 to enable multicolour mode, needed for alt palette
+			tsb $d031
 
-		lda #<80										; CHRCOUNT - Number of visual characters to display per row
-		sta $d05e
-		lda #>80
-		asl
-		asl
-		asl
-		asl
-		sta $d063										; ..xx.... high bits of CHRCOUNT
+			lda #<80										; CHRCOUNT - Number of visual characters to display per row
+			sta $d05e
+			lda #>80
+			asl
+			asl
+			asl
+			asl
+			sta $d063										; ..xx.... high bits of CHRCOUNT
 
-		lda #80*2										; LINESTEPLSB
-		sta $d058
-		lda #$00
-		sta $d059
+			lda #80*2										; LINESTEPLSB
+			sta $d058
+			lda #$00
+			sta $d059
 
-		lda #$50										; set TEXTXPOS to same as SDBDRWDLSB
-		sta $d04c
+			lda #$50										; set TEXTXPOS to same as SDBDRWDLSB
+			sta $d04c
 
-		DMA_RUN_JOB clearcolorramjob
-		DMA_RUN_JOB clearpartialbitmapjob1
-		DMA_RUN_JOB clearpartialbitmapjob2
-		DMA_RUN_JOB cleare000
+			DMA_RUN_JOB clearcolorramjob
+			DMA_RUN_JOB clearpartialbitmapjob1
+			DMA_RUN_JOB clearpartialbitmapjob2
 
-		; pal y border start
-		lda #<104
-		sta verticalcenter+0
-		lda #>104
-		sta verticalcenter+1
+			; pal y border start
+			lda #<104
+			sta verticalcenter+0
+			lda #>104
+			sta verticalcenter+1
 
-		bit $d06f
-		bpl pal
+			bit $d06f
+			bpl pal
 
-ntsc	lda #<55
-		sta verticalcenter+0
-		lda #>55
-		sta verticalcenter+1
+ntsc		lda #<55
+			sta verticalcenter+0
+			lda #>55
+			sta verticalcenter+1
 
-pal		lda verticalcenter+0
-		sta $d048
-		lda #%00001111
-		trb $d049
-		lda verticalcenter+1
-		tsb $d049
+pal			lda verticalcenter+0
+			sta $d048
+			lda #%00001111
+			trb $d049
+			lda verticalcenter+1
+			tsb $d049
 
-		lda #<.loword(screen1)							; set pointer to screen ram
-		sta $d060
-		lda #>.loword(screen1)
-		sta $d061
-		lda #<.hiword(screen1)
-		sta $d062
-		lda #>.hiword(screen1)
-		sta $d063
+			lda #<.loword(screen1)							; set pointer to screen ram
+			sta $d060
+			lda #>.loword(screen1)
+			sta $d061
+			lda #<.hiword(screen1)
+			sta $d062
+			lda #>.hiword(screen1)
+			sta $d063
 
-		; ----------------------------------------------- SET UP SCREEN 1
+			; ----------------------------------------------- SET UP SCREEN 1
 
-		lda #$00
-		sta screenrow
-		sta screencolumn
+			lda #$00
+			sta screenrow
+			sta screencolumn
 
-		ldx #<(bmpchars / 64)
-		ldy #>(bmpchars / 64)
+			ldx #<(bmpchars / 64)
+			ldy #>(bmpchars / 64)
 
-put10	stx screen1+0
-put11	sty screen1+1
+put10		stx screen1+0
+put11		sty screen1+1
 
-		clc
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
+			clc
+			txa
+			adc #$01
+			tax
+			tya
+			adc #$00
+			tay
 
-		clc
-		lda put10+1
-		adc #160
-		sta put10+1
-		lda put10+2
-		adc #0
-		sta put10+2
+			clc
+			lda put10+1
+			adc #160
+			sta put10+1
+			lda put10+2
+			adc #0
+			sta put10+2
 
-		clc
-		lda put11+1
-		adc #160
-		sta put11+1
-		lda put11+2
-		adc #0
-		sta put11+2
+			clc
+			lda put11+1
+			adc #160
+			sta put11+1
+			lda put11+2
+			adc #0
+			sta put11+2
 
-		inc screenrow
-		lda screenrow
-		cmp #25
-		bne put10
+			inc screenrow
+			lda screenrow
+			cmp #25
+			bne put10
 
-		lda #0
-		sta screenrow
-		inc screencolumn
-		inc screencolumn
-		lda screencolumn
-		cmp #80
-		beq endscreenplot1
+			lda #0
+			sta screenrow
+			inc screencolumn
+			inc screencolumn
+			lda screencolumn
+			cmp #80
+			beq endscreenplot1
 
-		lda #>(screen1)
-		sta put10+2
-		sta put11+2
-		clc
-		lda #<(screen1)
-		adc screencolumn
-		sta put10+1
-		adc #$01
-		sta put11+1
+			lda #>(screen1)
+			sta put10+2
+			sta put11+2
+			clc
+			lda #<(screen1)
+			adc screencolumn
+			sta put10+1
+			adc #$01
+			sta put11+1
 
-		jmp put10
+			jmp put10
 
 endscreenplot1
 
-		; ----------------------------------------------- SET UP SCREEN 2
+			; ----------------------------------------------- SET UP SCREEN 2
 
-		lda #$00
-		sta screenrow
-		sta screencolumn
+			lda #$00
+			sta screenrow
+			sta screencolumn
 
-		ldx #<(bmpchars / 64)
-		ldy #>(bmpchars / 64)
+			ldx #<(bmpchars / 64)
+			ldy #>(bmpchars / 64)
 
-put20	stx screen2+0
-put21	sty screen2+1
+put20		stx screen2+0
+put21		sty screen2+1
 
-		clc
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
+			clc
+			txa
+			adc #$01
+			tax
+			tya
+			adc #$00
+			tay
 
-		clc
-		lda put20+1
-		adc #160
-		sta put20+1
-		lda put20+2
-		adc #0
-		sta put20+2
+			clc
+			lda put20+1
+			adc #160
+			sta put20+1
+			lda put20+2
+			adc #0
+			sta put20+2
 
-		clc
-		lda put21+1
-		adc #160
-		sta put21+1
-		lda put21+2
-		adc #0
-		sta put21+2
+			clc
+			lda put21+1
+			adc #160
+			sta put21+1
+			lda put21+2
+			adc #0
+			sta put21+2
 
-		inc screenrow
-		lda screenrow
-		cmp #25
-		bne put20
+			inc screenrow
+			lda screenrow
+			cmp #25
+			bne put20
 
-		lda #0
-		sta screenrow
-		inc screencolumn
-		inc screencolumn
-		lda screencolumn
-		cmp #80
-		beq endscreenplot2
+			lda #0
+			sta screenrow
+			inc screencolumn
+			inc screencolumn
+			lda screencolumn
+			cmp #80
+			beq endscreenplot2
 
-		lda #>(screen2)
-		sta put20+2
-		sta put21+2
-		clc
-		lda #<(screen2)
-		adc screencolumn
-		sta put20+1
-		adc #$01
-		sta put21+1
+			lda #>(screen2)
+			sta put20+2
+			sta put21+2
+			clc
+			lda #<(screen2)
+			adc screencolumn
+			sta put20+1
+			adc #$01
+			sta put21+1
 
-		jmp put20
+			jmp put20
 
 endscreenplot2
 
-		; ----------------------------------------------- SET UP SCREEN 3
+			; ----------------------------------------------- SET UP SCREEN 3
 
-		lda #$00
-		sta screenrow
-		sta screencolumn
+			lda #$00
+			sta screenrow
+			sta screencolumn
 
-		ldx #<(screenchars1 / 64)
-		ldy #>(screenchars1 / 64)
+			ldx #<(screenchars1 / 64)
+			ldy #>(screenchars1 / 64)
 
-put30	stx screen1+40*2+2
-put31	sty screen1+40*2+3
+put30		stx screen1+40*2+2
+put31		sty screen1+40*2+3
 
-		clc
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
+			clc
+			txa
+			adc #$01
+			tax
+			tya
+			adc #$00
+			tay
 
-		clc
-		lda put30+1
-		adc #160
-		sta put30+1
-		lda put30+2
-		adc #0
-		sta put30+2
+			clc
+			lda put30+1
+			adc #160
+			sta put30+1
+			lda put30+2
+			adc #0
+			sta put30+2
 
-		clc
-		lda put31+1
-		adc #160
-		sta put31+1
-		lda put31+2
-		adc #0
-		sta put31+2
+			clc
+			lda put31+1
+			adc #160
+			sta put31+1
+			lda put31+2
+			adc #0
+			sta put31+2
 
-		inc screenrow
-		lda screenrow
-		cmp #25
-		bne put30
+			inc screenrow
+			lda screenrow
+			cmp #25
+			bne put30
 
-		lda #0
-		sta screenrow
-		inc screencolumn
-		inc screencolumn
-		lda screencolumn
-		cmp #80-2
-		beq endscreenplot3
+			lda #0
+			sta screenrow
+			inc screencolumn
+			inc screencolumn
+			lda screencolumn
+			cmp #80-2
+			beq endscreenplot3
 
-		lda #>(screen1+40*2+2)
-		sta put30+2
-		sta put31+2
-		clc
-		lda #<(screen1+40*2+2)
-		adc screencolumn
-		sta put30+1
-		adc #$01
-		sta put31+1
+			lda #>(screen1+40*2+2)
+			sta put30+2
+			sta put31+2
+			clc
+			lda #<(screen1+40*2+2)
+			adc screencolumn
+			sta put30+1
+			adc #$01
+			sta put31+1
 
-		jmp put30
+			jmp put30
 
 endscreenplot3
-		; ----------------------------------------------- SET UP SCREEN 4
+			; ----------------------------------------------- SET UP SCREEN 4
 
-		lda #$00
-		sta screenrow
-		sta screencolumn
+			lda #$00
+			sta screenrow
+			sta screencolumn
 
-		ldx #<(screenchars2 / 64)
-		ldy #>(screenchars2 / 64)
+			ldx #<(screenchars2 / 64)
+			ldy #>(screenchars2 / 64)
 
-put40	stx screen2+40*2+2
-put41	sty screen2+40*2+3
+put40		stx screen2+40*2+2
+put41		sty screen2+40*2+3
 
-		clc
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
+			clc
+			txa
+			adc #$01
+			tax
+			tya
+			adc #$00
+			tay
 
-		clc
-		lda put40+1
-		adc #160
-		sta put40+1
-		lda put40+2
-		adc #0
-		sta put40+2
+			clc
+			lda put40+1
+			adc #160
+			sta put40+1
+			lda put40+2
+			adc #0
+			sta put40+2
 
-		clc
-		lda put41+1
-		adc #160
-		sta put41+1
-		lda put41+2
-		adc #0
-		sta put41+2
+			clc
+			lda put41+1
+			adc #160
+			sta put41+1
+			lda put41+2
+			adc #0
+			sta put41+2
 
-		inc screenrow
-		lda screenrow
-		cmp #25
-		bne put40
+			inc screenrow
+			lda screenrow
+			cmp #25
+			bne put40
 
-		lda #0
-		sta screenrow
-		inc screencolumn
-		inc screencolumn
-		lda screencolumn
-		cmp #80-2
-		beq endscreenplot4
+			lda #0
+			sta screenrow
+			inc screencolumn
+			inc screencolumn
+			lda screencolumn
+			cmp #80-2
+			beq endscreenplot4
 
-		lda #>(screen2+40*2+2)
-		sta put40+2
-		sta put41+2
-		clc
-		lda #<(screen2+40*2+2)
-		adc screencolumn
-		sta put40+1
-		adc #$01
-		sta put41+1
+			lda #>(screen2+40*2+2)
+			sta put40+2
+			sta put41+2
+			clc
+			lda #<(screen2+40*2+2)
+			adc screencolumn
+			sta put40+1
+			adc #$01
+			sta put41+1
 
-		jmp put40
+			jmp put40
 
 endscreenplot4
 
-		; ----------------------------------------------- END OF SCREEN SETUP
+			; ----------------------------------------------- END OF SCREEN SETUP
 
-		; set up scr and col ptrs
-		lda #<.loword(SAFE_COLOR_RAM+40*2)
-		sta colptr+0
-		lda #>.loword(SAFE_COLOR_RAM+40*2)
-		sta colptr+1
-		lda #<.hiword(SAFE_COLOR_RAM+40*2)
-		sta colptr+2
-		lda #>.hiword(SAFE_COLOR_RAM+40*2)
-		sta colptr+3
+			; set up scr and col ptrs
+			lda #<.loword(SAFE_COLOR_RAM+40*2)
+			sta colptr+0
+			lda #>.loword(SAFE_COLOR_RAM+40*2)
+			sta colptr+1
+			lda #<.hiword(SAFE_COLOR_RAM+40*2)
+			sta colptr+2
+			lda #>.hiword(SAFE_COLOR_RAM+40*2)
+			sta colptr+3
 
-		lda #<.loword(screen1+40*2)
-		sta scrptr1+0
-		lda #>.loword(screen1+40*2)
-		sta scrptr1+1
-		lda #<.hiword(screen1+40*2)
-		sta scrptr1+2
-		lda #>.hiword(screen1+40*2)
-		sta scrptr1+3
+			lda #<.loword(screen1+40*2)
+			sta scrptr1+0
+			lda #>.loword(screen1+40*2)
+			sta scrptr1+1
+			lda #<.hiword(screen1+40*2)
+			sta scrptr1+2
+			lda #>.hiword(screen1+40*2)
+			sta scrptr1+3
 
-		lda #<.loword(screen2+40*2)
-		sta scrptr2+0
-		lda #>.loword(screen2+40*2)
-		sta scrptr2+1
-		lda #<.hiword(screen2+40*2)
-		sta scrptr2+2
-		lda #>.hiword(screen2+40*2)
-		sta scrptr2+3
+			lda #<.loword(screen2+40*2)
+			sta scrptr2+0
+			lda #>.loword(screen2+40*2)
+			sta scrptr2+1
+			lda #<.hiword(screen2+40*2)
+			sta scrptr2+2
+			lda #>.hiword(screen2+40*2)
+			sta scrptr2+3
 
-		; ----------------------------------------- set up gotox attribs
+			; ----------------------------------------- set up gotox attribs
 
-		ldx #0
+			ldx #0
 setatrbs
-		ldz #0
-		lda #%10010000 ; gotox and transparency bits set
-		sta [colptr],z
-		lda #<40
-		sta [scrptr1],z
-		sta [scrptr2],z
-		inz
-		lda #0
-		sta [colptr],z
-		lda #>40
-		sta [scrptr1],z
-		sta [scrptr2],z
+			ldz #0
+			lda #%10010000 ; gotox and transparency bits set
+			sta [colptr],z
+			lda #<40
+			sta [scrptr1],z
+			sta [scrptr2],z
+			inz
+			lda #0
+			sta [colptr],z
+			lda #>40
+			sta [scrptr1],z
+			sta [scrptr2],z
 
-		ldz #52 ; end of sphere right
-		lda #%00010000 ; gotox and transparency bits set
-		sta [colptr],z
-		lda #<320
-		sta [scrptr1],z
-		sta [scrptr2],z
-		inz
-		lda #0
-		sta [colptr],z
-		lda #>320
-		sta [scrptr1],z
-		sta [scrptr2],z
+			ldz #52 ; end of sphere right
+			lda #%00010000 ; gotox and transparency bits set
+			sta [colptr],z
+			lda #<320
+			sta [scrptr1],z
+			sta [scrptr2],z
+			inz
+			lda #0
+			sta [colptr],z
+			lda #>320
+			sta [scrptr1],z
+			sta [scrptr2],z
 
-		clc
-		lda colptr+0
-		adc #<160
-		sta colptr+0
-		lda colptr+1
-		adc #>160
-		sta colptr+1
+			clc
+			lda colptr+0
+			adc #<160
+			sta colptr+0
+			lda colptr+1
+			adc #>160
+			sta colptr+1
 
-		clc
-		lda scrptr1+0
-		adc #<160
-		sta scrptr1+0
-		lda scrptr1+1
-		adc #>160
-		sta scrptr1+1
+			clc
+			lda scrptr1+0
+			adc #<160
+			sta scrptr1+0
+			lda scrptr1+1
+			adc #>160
+			sta scrptr1+1
 
-		clc
-		lda scrptr2+0
-		adc #<160
-		sta scrptr2+0
-		lda scrptr2+1
-		adc #>160
-		sta scrptr2+1
+			clc
+			lda scrptr2+0
+			adc #<160
+			sta scrptr2+0
+			lda scrptr2+1
+			adc #>160
+			sta scrptr2+1
 
-		inx
-		cpx #25
-		beq endsetatrbt
-		jmp setatrbs
+			inx
+			cpx #25
+			beq endsetatrbt
+			jmp setatrbs
 
 endsetatrbt
 
-		; ----------------------------------------- set up alt palette
+			; ----------------------------------------- set up alt palette
 
-		; set up scr and col ptrs
-		lda #<.loword(SAFE_COLOR_RAM+41*2)
-		sta colptr+0
-		lda #>.loword(SAFE_COLOR_RAM+41*2)
-		sta colptr+1
-		lda #<.hiword(SAFE_COLOR_RAM+41*2)
-		sta colptr+2
-		lda #>.hiword(SAFE_COLOR_RAM+41*2)
-		sta colptr+3
+			; set up scr and col ptrs
+			lda #<.loword(SAFE_COLOR_RAM+41*2)
+			sta colptr+0
+			lda #>.loword(SAFE_COLOR_RAM+41*2)
+			sta colptr+1
+			lda #<.hiword(SAFE_COLOR_RAM+41*2)
+			sta colptr+2
+			lda #>.hiword(SAFE_COLOR_RAM+41*2)
+			sta colptr+3
 
-		ldx #0
+			ldx #0
 setaltpalette1
-		ldz #0
+			ldz #0
 setaltpalette2
-		lda #%00000000 ; use this for mirroring chars and stuff
-		sta [colptr],z
-		inz
-		lda #%01100000 ; bold+reverse = alt palette
-		sta [colptr],z
-		inz
-		cpz #48
-		bne setaltpalette2
+			lda #%00000000 ; use this for mirroring chars and stuff
+			sta [colptr],z
+			inz
+			lda #%01100000 ; bold+reverse = alt palette
+			sta [colptr],z
+			inz
+			cpz #48
+			bne setaltpalette2
 
-		clc
-		lda colptr+0
-		adc #<160
-		sta colptr+0
-		lda colptr+1
-		adc #>160
-		sta colptr+1
+			clc
+			lda colptr+0
+			adc #<160
+			sta colptr+0
+			lda colptr+1
+			adc #>160
+			sta colptr+1
 
-		inx
-		cpx #25
-		beq endsetaltpalette
-		jmp setaltpalette1
+			inx
+			cpx #25
+			beq endsetaltpalette
+			jmp setaltpalette1
 
 endsetaltpalette
 
-		; --------------------------------------------------------------------------
+			; --------------------------------------------------------------------------
 
-		lda #<$0800										; set (offset!) pointer to colour ram
-		sta $d064
-		lda #>$0800
-		sta $d065
+			lda #<$0800										; set (offset!) pointer to colour ram
+			sta $d064
+			lda #>$0800
+			sta $d065
 
-		lda #%00000000									; set bits 6 and 7 to 00 so palette 0 is banked in
-		sta $d070
+			lda #%00000000									; set bits 6 and 7 to 00 so palette 0 is banked in
+			sta $d070
 
-		ldx #$00
-:		lda palette+$0000,x
-		sta $d100,x
-		lda palette+$0100,x
-		sta $d200,x
-		lda palette+$0200,x
-		sta $d300,x
-		inx
-		bne :-
+			ldx #$00
+:			lda palette+$0000,x
+			sta $d100,x
+			lda palette+$0100,x
+			sta $d200,x
+			lda palette+$0200,x
+			sta $d300,x
+			inx
+			bne :-
 
-		lda #%10000000									; set bits 6 and 7 to 01 so palette 1 is banked in
-		sta $d070
+			lda #%10000000									; set bits 6 and 7 to 01 so palette 1 is banked in
+			sta $d070
 
-		ldx #$00										; set bitmap palette
-:		lda altpalette+$0000,x
-		sta $d100,x
-		lda altpalette+$0100,x
-		sta $d200,x
-		lda altpalette+$0200,x
-		sta $d300,x
-		inx
-		bne :-
+			ldx #$00										; set bitmap palette
+:			lda altpalette+$0000,x
+			sta $d100,x
+			lda altpalette+$0100,x
+			sta $d200,x
+			lda altpalette+$0200,x
+			sta $d300,x
+			inx
+			bne :-
 
-		lda #%00000000									; WHY? map the first bank back in
-		sta $d070
+			lda #%00000000									; WHY? map the first bank back in
+			sta $d070
 
-		lda $d070
-		and #%11000000									; set bits 4 and 5 (BTPALSEL) to 00 so bitmap palette is palette 0
-		ora #%00000010									; set bits 0 and 1 (ABTPALSEL) to 01 so alt palette is palette 1
-		sta $d070
+			lda $d070
+			and #%11000000									; set bits 4 and 5 (BTPALSEL) to 00 so bitmap palette is palette 0
+			ora #%00000010									; set bits 0 and 1 (ABTPALSEL) to 01 so alt palette is palette 1
+			sta $d070
 
-		lda #$7f										; disable CIA interrupts
-		sta $dc0d
-		sta $dd0d
-		lda $dc0d
-		lda $dd0d
+			lda #$7f										; disable CIA interrupts
+			sta $dc0d
+			sta $dd0d
+			lda $dc0d
+			lda $dd0d
 
-		lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
-		sta $d01a
+			lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
+			sta $d01a
 
-		lda #$ff										; setup IRQ interrupt
-		sta $d012
-		lda #<irq1
-		sta $fffe
-		lda #>irq1
-		sta $ffff
+			lda #$ff										; setup IRQ interrupt
+			sta $d012
+			lda #<irq1
+			sta $fffe
+			lda #>irq1
+			sta $ffff
 
-		lda #$01										; ACK
-		sta $d01a
+			lda #$01										; ACK
+			sta $d01a
 
-		cli
+			cli
 		
 loop
-		lda $d020
-		jmp loop
+			lda $d020
+			jmp loop
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -741,7 +740,7 @@ irq1
 
 ; ----------------------------------------------------------------------------------------------------
 
-movescreen
+movescreen:
 
 			ldx frame
 			lda rrbsin8,x
@@ -932,31 +931,6 @@ clearpartialbitmapjob2
 
 ; -------------------------------------------------------------------------------------------------
 
-cleare000
-				; f018a = 11 bytes, f018b is 12 bytes
-				.byte $0a ; Request format is F018A
-				;.byte $80, (bmpchars >> 20) ; sourcebank
-				.byte $81, ($e000 >> 20) ; destbank
-
-				.byte $82, 0 ; Source skip rate (256ths of bytes)
-				.byte $83, 1 ; Source skip rate (whole bytes)
-
-				.byte $84, 0 ; Destination skip rate (256ths of bytes)
-				.byte $85, 1 ; Destination skip rate (whole bytes)
-
-				.byte $00 ; No more options
-
-				.byte %00000011	; fill and don't chain
-				.word 8190 ; Size of fill
-
-				.word 0
-				.byte 0
-
-				.word $e000 & $ffff
-				.byte (($e000 >> 16) & $0f)
-
-; -------------------------------------------------------------------------------------------------
-
 .segment "TABLES"
 
 sin8
@@ -1136,7 +1110,6 @@ screenrow		.byte 0
 screencolumn	.byte 0
 vertindex		.byte 0
 polyindex		.byte 0
-;pilo			.byte 0
 pihi			.byte 0
 rrbxpos			.byte 0
 
@@ -1146,6 +1119,7 @@ q0				.byte $00, $00, $00, $00
 q32				.byte $00, $00, $20, $00
 q80				.byte $00, $00, $c0, $00
 q100			.byte $00, $00, $60, $00
+q128			.byte $00, $00, $80, $00
 
 qlightadd		.byte $00, $00, $10, $00
 qlightmult		.byte $00, $00, $2e, $00

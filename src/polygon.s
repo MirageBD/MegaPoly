@@ -10,7 +10,7 @@
 
 drawpolygons:
 
-			; ---------------------------- ROTATE POINTS
+			; ---------------------------- INIT TRANSFORM VERTICES
 
 			lda #<vertsx
 			sta vxptr+0
@@ -32,8 +32,6 @@ drawpolygons:
 			lda #$00
 rploop		sta vertindex
 
-			;inc $d020
-
 			ldz vertindex
 			ldq (vxptr),z
 			stq sx
@@ -48,14 +46,13 @@ rploop		sta vertindex
 			MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
 			MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
 
-			; take distance, sub z
-			ldq qdistance
+			
+			ldq qdistance                                   ; take distance, sub z
 			sec
 			sbcq fz
 			stq fz
 
-			; multiply by factor
-			ldq q80
+			ldq q80                                         ; multiply by factor
 			MATH_DIV q80, fz, fz
 			MATH_MUL fx, fz, fx
 			MATH_MUL fy, fz, fy
@@ -155,7 +152,6 @@ not_backface_culled:
 
 			ldx polyindex									; get poly index
 			lda times4lo,x									; and multiply by 4
-			;sta pilo
 			sta vxptr+0
 			sta vyptr+0
 			sta vzptr+0
