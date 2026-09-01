@@ -1,5 +1,9 @@
 .segment "RASTERIZE"
 
+.define leftSlopeX		$9c								; overwrites rotation matrix in ZP/BP, but we're done with that anyway
+.define rightSlopeX		$a0
+.define totalSlopeX		$a4
+
 leftX			.byte $00, $00, $00, $00
 leftY			.byte $00, $00, $00, $00
 

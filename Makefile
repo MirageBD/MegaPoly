@@ -76,6 +76,7 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/mathmacros.s \
 					$(SRC_DIR)/model.s \
 					$(SRC_DIR)/modplay.s \
+					$(SRC_DIR)/polygon.s \
 					$(SRC_DIR)/rasterize.s \
 					Makefile Linkfile
 	$(AS) $(ASFLAGS) -o $@ $<
