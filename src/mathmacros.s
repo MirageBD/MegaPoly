@@ -92,39 +92,6 @@ end
 .endscope
 .endmacro
 
-.macro MATH_BUILD_ROTMAT
-.scope
-		MATH_MUL sz, sx, t1
-		MATH_MUL sz, cx, t2
-		MATH_MUL sz, sy, t3
-		MATH_MUL sz, cy, m32
-
-		MATH_MUL cz, cy, m33
-		MATH_MUL cz, sx, t4
-		MATH_MUL cz, cx, t5
-
-		MATH_NEG sy, m31
-
-		MATH_MUL cz, sy, t6
-
-		MATH_MUL sx, cy, m21
-
-		MATH_MUL sx, t3, m22
-		MATH_ADD m22, t5, m22
-
-		MATH_MUL sx, t6, m23
-		MATH_SUB m23, t2, m23
-
-		MATH_MUL cx, cy, m11
-
-		MATH_MUL cx, t3, m12
-		MATH_SUB m12, t4, m12
-
-		MATH_MUL cx, t6, m13
-		MATH_ADD m13, t1, m13
-.endscope
-.endmacro
-
 .macro MATH_DOT3 px, m1, py, m2, pz, m3, output
 		MATH_MUL pz, m3, t2
 		MATH_MUL py, m2, t1
@@ -164,6 +131,14 @@ negtivea:				MATH_NEG DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point
 						bra end
 postivea:				MATH_MOV DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point result
 end:
+.endscope
+.endmacro
+
+.macro MATH_MUL_APOS_BPOS opA, opB, result
+.scope
+				MATH_MOV opA, MULTINA			; a is positive
+				MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
+				MATH_MOV MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
 .endscope
 .endmacro
 

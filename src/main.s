@@ -796,7 +796,7 @@ foo2		ldq cos32
 			;ldq q1
 			stq cz
 
-			MATH_BUILD_ROTMAT
+			jsr buildrotationmatrix
 
 			;lda #$b8
 			;sta $d020
@@ -872,10 +872,7 @@ rploop		sta vertindex
 			jmp rploop
 :
 
-			;lda #$20
-			;sta $d020
-
-			; ---------------------------- DRAW POLYGONS
+			; ---------------------------- INIT DRAW POLYGONS
 
 			lda #<vertsxconv								; set pointers to transformed vertices
 			sta vxcptr+0
@@ -887,11 +884,10 @@ rploop		sta vertindex
 			lda #>vertsyconv
 			sta vycptr+1
 
+			; ---------------------------- DRAW POLYGONS
+
 			lda #$00
 dploop		sta polyindex
-
-			;lda #$00
-			;sta $d020
 
 			ldx polyindex									; get 3 transformed vertices, left/mid/right X/Y
 			ldz indicesp1,x
@@ -920,31 +916,27 @@ dploop		sta polyindex
 			ldq (vycptr),z
 			stq rightY
 
-			sec
-			ldq midY										; calculate winding order
-			sbcq leftY
-			stq t1
-
-			sec
-			ldq rightX
-			sbcq midX
-			stq t2
-
-			sec
-			ldq midX
+			ldq midX										; calculate winding order
 			sbcq leftX
-			stq t3
-
-			sec
+			stq MULTINA
 			ldq rightY
 			sbcq midY
-			stq t4
+			stq MULTINB
 
-			MATH_MUL t1, t2, t5
-			MATH_MUL t3, t4, t6
-			MATH_SUB t5, t6, t1
+			MATH_MOV MULTOUT+2, t1
 
-			bit t1+3
+			ldq midY
+			sbcq leftY
+			stq MULTINA
+			ldq rightX
+			sbcq midX
+			stq MULTINB
+
+			ldq MULTOUT+2
+			sbcq t1
+			stq t1
+
+			bit t1+3										; backface cull
 			bmi not_backface_culled
 			jmp skippolydraw
 
@@ -952,26 +944,26 @@ not_backface_culled:
 
 			; ROTATE/LIGHT NORMALS/POLYS
 
-			ldx polyindex							; get poly index
-			lda times4lo,x							; and multiply by 4
-			sta pilo
+			ldx polyindex									; get poly index
+			lda times4lo,x									; and multiply by 4
+			;sta pilo
 			sta vxptr+0
 			sta vyptr+0
 			sta vzptr+0
 			lda times4hi,x
 			sta pihi
 
-			clc										; add normals addresses. needs to be page aligned
+			clc												; add normals addresses. needs to be page aligned
 			lda #>normalsx
 			adc pihi
 			sta vxptr+1
 
-			clc
+			;clc
 			lda #>normalsy
 			adc pihi
 			sta vyptr+1
 
-			clc
+			;clc
 			lda #>normalsz
 			adc pihi
 			sta vzptr+1
@@ -992,7 +984,7 @@ not_backface_culled:
 
 			MATH_DOT3 fx, lightvec+0, fy, lightvec+4, fz, lightvec+8, fx
 
-			MATH_MUL fx, qlightmult, fx
+			MATH_MUL_APOS_BPOS fx, qlightmult, fx
 			MATH_ADD fx, qlightadd, fx
 
 			ldx polyindex
@@ -1008,9 +1000,8 @@ not_backface_culled:
 
 skippolydraw
 
-			clc
 			lda polyindex
-			adc #$01
+			inc
 			cmp #numpolies
 			beq :+
 			jmp dploop
@@ -1098,6 +1089,41 @@ setatrbs2
 endsetatrbt2
 
 			rts
+
+; ----------------------------------------------------------------------------------------------------
+
+buildrotationmatrix:
+
+		MATH_MUL sz, sx, t1
+		MATH_MUL sz, cx, t2
+		MATH_MUL sz, sy, t3
+		MATH_MUL sz, cy, m32
+
+		MATH_MUL cz, cy, m33
+		MATH_MUL cz, sx, t4
+		MATH_MUL cz, cx, t5
+
+		MATH_NEG sy, m31
+
+		MATH_MUL cz, sy, t6
+
+		MATH_MUL sx, cy, m21
+
+		MATH_MUL sx, t3, m22
+		MATH_ADD m22, t5, m22
+
+		MATH_MUL sx, t6, m23
+		MATH_SUB m23, t2, m23
+
+		MATH_MUL cx, cy, m11
+
+		MATH_MUL cx, t3, m12
+		MATH_SUB m12, t4, m12
+
+		MATH_MUL cx, t6, m13
+		MATH_ADD m13, t1, m13
+
+		rts
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -1422,7 +1448,7 @@ screenrow		.byte 0
 screencolumn	.byte 0
 vertindex		.byte 0
 polyindex		.byte 0
-pilo			.byte 0
+;pilo			.byte 0
 pihi			.byte 0
 rrbxpos			.byte 0
 
