@@ -12,6 +12,8 @@
 
 .define moddata			$40000
 
+.define matrix4x4_TEMP	$0a00
+
 .define colptr			$90
 .define scrptr1			$94
 .define scrptr2			$98

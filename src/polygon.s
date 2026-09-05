@@ -42,9 +42,10 @@ rploop		sta vertindex
 			ldq (vzptr),z
 			stq sz
 
-			MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
-			MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
-			MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
+			;MATH_DOT3 sx, m11+0*4, sy, m11+1*4, sz, m11+2*4, fx
+			;MATH_DOT3 sx, m11+3*4, sy, m11+4*4, sz, m11+5*4, fy
+			;MATH_DOT3 sx, m11+6*4, sy, m11+7*4, sz, m11+8*4, fz
+			MATH_MUL_VEC3_MAT3x3 sx, sy, sz, m11, fx, fy, fz
 			
 			ldq qdistance                                   ; take distance, sub z
 			sec
@@ -63,12 +64,8 @@ rploop		sta vertindex
 			ldy vertindex
 			lda fx+2
 			sta vertsxconv+2,y
-			lda fx+3
-			sta vertsxconv+3,y
 			lda fy+2
 			sta vertsyconv+2,y
-			lda fy+3
-			sta vertsyconv+3,y
 
 			clc
 			lda vertindex
@@ -183,9 +180,10 @@ not_backface_culled:
 			ldq (vzptr),z
 			stq sz
 
-			MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
-			MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
-			MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
+			;MATH_DOT3 sx, m11+0*4, sy, m11+1*4, sz, m11+2*4, fx
+			;MATH_DOT3 sx, m11+3*4, sy, m11+4*4, sz, m11+5*4, fy
+			;MATH_DOT3 sx, m11+6*4, sy, m11+7*4, sz, m11+8*4, fz
+			MATH_MUL_VEC3_MAT3x3 sx, sy, sz, m11, fx, fy, fz
 
 			MATH_DOT3 fx, lightvec+0, fy, lightvec+4, fz, lightvec+8, fx
 
