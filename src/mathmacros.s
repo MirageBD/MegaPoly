@@ -102,6 +102,15 @@ end
 		stq output
 .endmacro
 
+.macro MATH_DIV_APOS_BPOS numerator, denominator, result
+.scope
+						MATH_MOV numerator, MULTINA
+						MATH_MOV denominator, MULTINB
+						MATH_MOV DIVOUTWHOLE+2, result	; add 2 to get new 16.16 fixed point result
+end:
+.endscope
+.endmacro
+
 .macro MATH_DIV numerator, denominator, result
 .scope
 						MATH_ABS numerator, MULTINA

@@ -45,15 +45,15 @@ rploop		sta vertindex
 			MATH_DOT3 sx, m11, sy, m12, sz, m13, fx
 			MATH_DOT3 sx, m21, sy, m22, sz, m23, fy
 			MATH_DOT3 sx, m31, sy, m32, sz, m33, fz
-
 			
 			ldq qdistance                                   ; take distance, sub z
 			sec
 			sbcq fz
-			stq fz
 
-			ldq q80                                         ; multiply by factor
-			MATH_DIV q80, fz, fz
+			stq MULTINB
+			MATH_MOV q80, MULTINA							; multiply by factor
+			MATH_MOV DIVOUTWHOLE+2, fz						; add 2 to get new 16.16 fixed point result
+
 			MATH_MUL fx, fz, fx
 			MATH_MUL fy, fz, fy
 
