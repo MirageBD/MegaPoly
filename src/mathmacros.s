@@ -102,6 +102,22 @@ end
 		stq output
 .endmacro
 
+.macro MATH_DOT3_APOS px, m1, py, m2, pz, m3, output
+		ldq pz
+		stq MULTINA
+		MATH_MUL_APOS m3, t3
+		ldq py
+		stq MULTINA
+		MATH_MUL_APOS m2, t2
+		ldq px
+		stq MULTINA
+		MATH_MUL_APOS m1, t1
+		clc
+		adcq t2
+		adcq t3
+		stq output
+.endmacro
+
 .macro MATH_MUL_APOS opB, result
 .scope
 						bit opB+3
@@ -111,6 +127,24 @@ negresult:				MATH_NEG opB, MULTINB			; a is positive, b is negative - use negat
 						bra end
 posresult:				MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
 						MATH_MOV MULTOUT+2, result
+end:
+.endscope
+.endmacro
+
+.macro MATH_MUL_APOS_DIRECT opB
+.scope
+						bit opB+3
+						bpl posresult
+negresult:				MATH_NEG opB, MULTINB			; a is positive, b is negative - use negative result
+						lda #0
+						tax
+						tay
+						taz
+						;sec
+						sbcq MULTOUT+2
+						bra end
+posresult:				MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
+						ldq MULTOUT+2
 end:
 .endscope
 .endmacro
@@ -172,19 +206,19 @@ pospz:					MATH_MOV pz, MULTINA
 						MATH_MUL_APOS mat+5*4, matrix4x4_TEMP+7*4
 						MATH_MUL_APOS mat+8*4, matrix4x4_TEMP+8*4
 
-muldone:				clc
+muldone:				;clc
 						ldq  matrix4x4_TEMP+0*4
 						adcq matrix4x4_TEMP+3*4
 						adcq matrix4x4_TEMP+6*4
 						stq pox
 
-						clc
+						;clc
 						ldq  matrix4x4_TEMP+1*4
 						adcq matrix4x4_TEMP+4*4
 						adcq matrix4x4_TEMP+7*4
 						stq poy
 
-						clc
+						;clc
 						ldq  matrix4x4_TEMP+2*4
 						adcq matrix4x4_TEMP+5*4
 						adcq matrix4x4_TEMP+8*4
@@ -235,9 +269,9 @@ end:
 
 .macro MATH_MUL_APOS_BPOS opA, opB, result
 .scope
-				MATH_MOV opA, MULTINA			; a is positive
-				MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
-				MATH_MOV MULTOUT+2, result		; add 2 to get new 16.16 fixed point result
+				MATH_MOV opA, MULTINA
+				MATH_MOV opB, MULTINB
+				MATH_MOV MULTOUT+2, result
 .endscope
 .endmacro
 

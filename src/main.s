@@ -727,8 +727,13 @@ irq1
 			DMA_RUN_JOB clearpartialbitmapjob1
 :		
 
+			lda #$40
+			sta $d020
 			jsr setuprotationmatrix
 			jsr buildrotationmatrix
+			lda #$c0
+			sta $d020
+			jsr transformvertices
 			jsr drawpolygons
 
 			ldx #$00

@@ -8,7 +8,7 @@
 
 ; ----------------------------------------------------------------------------------------------------
 
-drawpolygons:
+transformvertices:
 
 			; ---------------------------- INIT TRANSFORM VERTICES
 
@@ -34,46 +34,45 @@ rploop		sta vertindex
 
 			ldz vertindex
 			ldq (vxptr),z
-			stq sx
+			stq fx
 			ldz vertindex
 			ldq (vyptr),z
-			stq sy
+			stq fy
 			ldz vertindex
 			ldq (vzptr),z
-			stq sz
+			stq fz
 
-			;MATH_DOT3 sx, m11+0*4, sy, m11+1*4, sz, m11+2*4, fx
-			;MATH_DOT3 sx, m11+3*4, sy, m11+4*4, sz, m11+5*4, fy
-			;MATH_DOT3 sx, m11+6*4, sy, m11+7*4, sz, m11+8*4, fz
-			MATH_MUL_VEC3_MAT3x3 sx, sy, sz, m11, fx, fy, fz
+			MATH_MUL_VEC3_MAT3x3 fx, fy, fz, m11, sx, sy, sz
 			
+			;sec
 			ldq qdistance                                   ; take distance, sub z
-			sec
-			sbcq fz
-
+			sbcq sz
 			stq MULTINB
+
 			MATH_MOV q80, MULTINA							; multiply by factor
-			MATH_MOV DIVOUTWHOLE+2, fz						; add 2 to get new 16.16 fixed point result
+			MATH_MOV DIVOUTWHOLE+2, MULTINA					; add 2 to get new 16.16 fixed point result
 
-			MATH_MUL fx, fz, fx
-			MATH_MUL fy, fz, fy
-
-			MATH_ADD fx, q100, fx
-			MATH_ADD fy, q100, fy
-
-			ldy vertindex
-			lda fx+2
-			sta vertsxconv+2,y
-			lda fy+2
-			sta vertsyconv+2,y
+			MATH_MUL_APOS_DIRECT sx							; perspective divide
+			adcq q100										; and move to center of screen
+			ldx vertindex
+			sty vertsxconv+2,x
+			MATH_MUL_APOS_DIRECT sy
+			adcq q100
+			ldx vertindex
+			sty vertsyconv+2,x
 
 			clc
-			lda vertindex
+			txa
 			adc #$04
 			cmp #numverts*4
 			beq :+
 			jmp rploop
 :
+			rts
+
+; ----------------------------------------------------------------------------------------------------
+
+drawpolygons:
 
 			; ---------------------------- INIT DRAW POLYGONS
 
@@ -172,29 +171,40 @@ not_backface_culled:
 
 			ldz #$00
 			ldq (vxptr),z
-			stq sx
+			stq fx
 			ldz #$00
 			ldq (vyptr),z
-			stq sy
+			stq fy
 			ldz #$00
 			ldq (vzptr),z
-			stq sz
+			stq fz
 
-			;MATH_DOT3 sx, m11+0*4, sy, m11+1*4, sz, m11+2*4, fx
-			;MATH_DOT3 sx, m11+3*4, sy, m11+4*4, sz, m11+5*4, fy
-			;MATH_DOT3 sx, m11+6*4, sy, m11+7*4, sz, m11+8*4, fz
-			MATH_MUL_VEC3_MAT3x3 sx, sy, sz, m11, fx, fy, fz
+			MATH_MUL_VEC3_MAT3x3 fx, fy, fz, m11, sx, sy, sz
 
-			MATH_DOT3 fx, lightvec+0, fy, lightvec+4, fz, lightvec+8, fx
+			ldq sz
+			stq MULTINA
+			MATH_MUL_APOS lightvec+8, t3
+			ldq sy
+			stq MULTINA
+			MATH_MUL_APOS lightvec+4, t2
+			ldq sx
+			stq MULTINA
+			MATH_MUL_APOS lightvec+0, t1
+			clc
+			adcq t2
+			adcq t3
+			stq MULTINA
 
-			MATH_MUL_APOS_BPOS fx, qlightmult, fx
-			MATH_ADD fx, qlightadd, fx
+			MATH_MOV qlightmult, MULTINB
+			ldq MULTOUT+2
+			adcq qlightadd
+
+			tya
 
 			ldx polyindex
 			ldy orgcol,x
-			lda colorremap,y
 			clc
-			adc fx+2
+			adc colorremap,y
 			sta linecolour
 
 			jsr rasterizepoly
