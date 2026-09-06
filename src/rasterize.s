@@ -22,12 +22,10 @@ rightSpanY		.byte $00, $00, $00, $00
 totalSpanY		.byte $00, $00, $00, $00
 
 .macro SWAP this, that
-		ldq this
-		stq FP_A
-		ldq that
-		stq this
-		ldq FP_A
-		stq that
+		ldy this
+		ldx that
+		stx this
+		sty that
 .endmacro		
 
 .macro GENERATE_SLOPE_TABLE_NONCLIPPED starty, spanx, spany, delta, destinationlo
@@ -112,18 +110,24 @@ rasterizepoly:
 			lda leftX+2
 			cmp midX+2
 			bmi :+
-			SWAP leftX, midX
-			SWAP leftY, midY
+				ldx midX+2
+				stx leftX+2
+				sta midX+2
+				SWAP leftY+2, midY+2
 :			lda leftX+2
 			cmp rightX+2
 			bmi :+
-			SWAP leftX, rightX
-			SWAP leftY, rightY
+				ldx rightX+2
+				stx leftX+2
+				sta rightX+2
+				SWAP leftY+2, rightY+2
 :			lda midX+2
 			cmp rightX+2
 			bmi :+
-			SWAP midX, rightX
-			SWAP midY, rightY
+				ldx rightX+2
+				stx midX+2
+				sta rightX+2			
+				SWAP midY+2, rightY+2
 :
 			; ----------------------------------------------- calculate X spans. these are always positive, so can do simpler Accumulator subtract
 
@@ -131,11 +135,9 @@ rasterizepoly:
 			lda midX+2
 			sbc leftX+2
 			sta leftSpanX+2
-			sec
 			lda rightX+2
 			sbc midX+2
 			sta rightSpanX+2
-			sec
 			lda rightX+2
 			sbc leftX+2
 			sta totalSpanX+2 ; return here if total == 0 ?
