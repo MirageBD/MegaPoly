@@ -30,15 +30,15 @@ transformvertices:
 			; ---------------------------- TRANSFORM VERTICES
 
 			lda #$00
-rploop		sta vertindex
-
-			ldz vertindex
+			sta vertindex
+rploop
+			ldz #0
 			ldq (vxptr),z
 			stq fx
-			ldz vertindex
+			ldz #0
 			ldq (vyptr),z
 			stq fy
-			ldz vertindex
+			ldz #0
 			ldq (vzptr),z
 			stq fz
 
@@ -55,16 +55,26 @@ rploop		sta vertindex
 			MATH_MUL_APOS_DIRECT sx							; perspective divide
 			adcq q100										; and move to center of screen
 			ldx vertindex
-			sty vertsxconv+2,x
+			sty vertsxconv,x
 			MATH_MUL_APOS_DIRECT sy
 			adcq q100
 			ldx vertindex
-			sty vertsyconv+2,x
+			sty vertsyconv,x
 
 			clc
-			txa
-			adc #$04
-			cmp #numverts*4
+			lda vxptr+0
+			adc #4
+			sta vxptr+0
+			sta vyptr+0
+			sta vzptr+0
+			bne :+
+			inc vxptr+1
+			inc vyptr+1
+			inc vzptr+1
+
+:			inc vertindex
+			lda vertindex
+			cmp #numverts
 			beq :+
 			jmp rploop
 :
@@ -88,35 +98,26 @@ drawpolygons:
 
 			; ---------------------------- DRAW POLYGONS
 
-			lda #$00
-dploop		sta polyindex
+			ldx #$00
+dploop		stx polyindex
 
-			ldx polyindex									; get 3 transformed vertices, left/mid/right X/Y
 			ldz indicesp1,x
-			ldq (vxcptr),z
-			stq leftX
-			ldx polyindex
-			ldz indicesp1,x
-			ldq (vycptr),z
-			stq leftY
+			lda (vxcptr),z
+			sta leftX+2
+			lda (vycptr),z
+			sta leftY+2
 
-			ldx polyindex
 			ldz indicesp2,x
-			ldq (vxcptr),z
-			stq midX
-			ldx polyindex
-			ldz indicesp2,x
-			ldq (vycptr),z
-			stq midY
+			lda (vxcptr),z
+			sta midX+2
+			lda (vycptr),z
+			sta midY+2
 
-			ldx polyindex
 			ldz indicesp3,x
-			ldq (vxcptr),z
-			stq rightX
-			ldx polyindex
-			ldz indicesp3,x
-			ldq (vycptr),z
-			stq rightY
+			lda (vxcptr),z
+			sta rightX+2
+			lda (vycptr),z
+			sta rightY+2
 
 			ldq midX										; calculate winding order
 			sbcq leftX
@@ -213,9 +214,9 @@ not_backface_culled:
 
 skippolydraw
 
-			lda polyindex
-			inc
-			cmp #numpolies
+			ldx polyindex
+			inx
+			cpx #numpolies
 			beq :+
 			jmp dploop
 

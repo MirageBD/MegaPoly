@@ -28,7 +28,7 @@ totalSpanY		.byte $00, $00, $00, $00
 		sty that
 .endmacro		
 
-.macro GENERATE_SLOPE_TABLE_NONCLIPPED starty, spanx, spany, delta, destinationlo
+.macro GENERATE_SLOPE_TABLE_NONCLIPPED startx, starty, spanx, spany, slope
 .scope
 					lda spanx+2
 					beq span_skip									; span 0 -> skip rendering
@@ -36,9 +36,7 @@ totalSpanY		.byte $00, $00, $00, $00
 					sta dma_slpcount+0
 					lda starty+2									; Y start
 					sta dma_slpsadr+0
-					clc
-					lda destinationlo								; put Y numbers at xxyy
-					adc leftX+2
+					lda startx+2									; X start
 					sta dma_slpdadr+0
 
 					bit spany+3										; if Y span negative, then set DMA to render in reverse direction (and negate delta to start in reverse order)
@@ -46,18 +44,18 @@ totalSpanY		.byte $00, $00, $00, $00
 
 span_positive:		lda #%00000000									; positive DMA copy
 					sta dma_slpdir
-					lda delta+1										; Y/X delta low
+					lda slope+1										; Y/X delta low
 					sta dma_slpsskiplo+1
-					lda delta+2										; Y/X delta high
+					lda slope+2										; Y/X delta high
 					sta dma_slpsskiphi+1
 					bra span_finalise
 
 span_negative:		lda #%00010000									; negative DMA copy
 					sta dma_slpdir
-					lda delta+1										; negative Y/X delta low
+					lda slope+1										; negative Y/X delta low
 					eor #$ff
 					sta dma_slpsskiplo+1
-					lda delta+2										; negative Y/X delta low
+					lda slope+2										; negative Y/X delta low
 					eor #$ff
 					sta dma_slpsskiphi+1
 					;jmp span_finalise
@@ -180,7 +178,7 @@ rasterizepoly:
 			MATH_MUL_APOS_DIRECT totalSlopeX
 			;clc
 			adcq leftY
-			cmpq midY
+			cpy midY+2
 			bmi plg_inverse
 plg_noninverse: ; longest slope running at bottom
 			lda #>slopebottom
@@ -199,11 +197,11 @@ plg_checkend
 
 pdlshort:	lda #>slopetop
 			sta dma_slpdadr+1
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #0				; partial span left
-			GENERATE_SLOPE_TABLE_NONCLIPPED  midY, rightSpanX, rightSpanY, rightSlopeX, leftSpanX+2		; partial span right
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY,  leftSpanX,  leftSpanY,  leftSlopeX 			; partial span left
+			GENERATE_SLOPE_TABLE_NONCLIPPED  midX,  midY, rightSpanX, rightSpanY, rightSlopeX			; partial span right
 pdllong:	lda #>slopebottom
 			sta dma_slpdadr+1
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftY, totalSpanX, totalSpanY, totalSlopeX, #0				; total span
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftX, leftY, totalSpanX, totalSpanY, totalSlopeX			; total span
 
 		; ----------------------------------------------- set up polygon
 

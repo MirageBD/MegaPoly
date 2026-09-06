@@ -685,15 +685,18 @@ loop
 irq1
 			pha
 
-			;lda #$b0
-			;sta $d020
+			lda #$b0
+			sta $d020
 
 			jsr peppitoPlay
 
+			lda #$c0
+			sta $d020
+
 			jsr movescreen
 
-			;lda #$40
-			;sta $d020
+			lda #$40
+			sta $d020
 
 			lda flipflop
 			eor #$ff
