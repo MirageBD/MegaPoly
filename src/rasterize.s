@@ -22,6 +22,8 @@ leftSpanY		.byte $00, $00, $00, $00
 rightSpanY		.byte $00, $00, $00, $00
 totalSpanY		.byte $00, $00, $00, $00
 
+middleLengthY	.byte $00
+
 .macro SWAP this, that
 		ldy this
 		ldx that
@@ -179,17 +181,25 @@ rasterizepoly:
 			MATH_MUL_APOS_DIRECT totalSlopeX
 			adcq leftY								; add leftY. Q now contains the Y position of the point marked (*)
 			stq midY2
-			
+
 			cpy midY+2
 			bmi plg_inverse
 plg_noninverse: ; longest slope running at bottom
 			inc midY2+2
+			sec
+			tya ; lda midY2+2
+			sbc midY+2
+			sta middleLengthY
 			lda #>slopebottom
 			sta pdllong+1
 			lda #>slopetop
 			sta pdlshort+1
 			bra plg_checkend
-plg_inverse: ; longest slope running at top		
+plg_inverse: ; longest slope running at top
+			sec
+			lda midY+2
+			sbc midY2+2
+			sta middleLengthY
 			lda #>slopetop
 			sta pdllong+1
 			lda #>slopebottom

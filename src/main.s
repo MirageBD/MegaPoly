@@ -688,7 +688,7 @@ irq1
 			lda #$b0
 			sta $d020
 
-			jsr peppitoPlay
+			;jsr peppitoPlay
 
 			lda #$c0
 			sta $d020
