@@ -140,32 +140,25 @@ rasterizepoly:
 			sbc leftX+2
 			sta totalSpanX+2 ; return here if total == 0 ?
 
-			; ----------------------------------------------- calculate Y spans and slopes
+			; ----------------------------------------------- calculate slopes
 
-			lda #>slopetop
-			sta dma_slpdadr+1
 			sec	
 			ldq midY
 			sbcq leftY
 			stq leftSpanY
 			MATH_DIV_BPOS leftSpanY,  leftSpanX,  leftSlopeX
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #0				; partial span left
 
 			sec
 			ldq rightY
 			sbcq midY
 			stq rightSpanY
 			MATH_DIV_BPOS rightSpanY, rightSpanX, rightSlopeX
-			GENERATE_SLOPE_TABLE_NONCLIPPED  midY, rightSpanX, rightSpanY, rightSlopeX, leftSpanX+2		; partial span right
 
-			lda #>slopebottom
-			sta dma_slpdadr+1
 			sec
 			ldq rightY
 			sbcq leftY
 			stq totalSpanY
 			MATH_DIV_BPOS totalSpanY, totalSpanX, totalSlopeX
-			GENERATE_SLOPE_TABLE_NONCLIPPED leftY, totalSpanX, totalSpanY, totalSlopeX, #0				; total span
 
 			; check if we're inverted (I.E. longest slope is running at the top)
 			; (leftY + leftspanX * totalSlopeX) is this point (*):
@@ -181,26 +174,34 @@ rasterizepoly:
 			;
 			; if this point is smaller than point 2 (midY), then the longest slope is at the top (inverse case)
 
-			MATH_MUL leftSpanX, totalSlopeX, FP_A	; optimise this later. no need to store in temp Q reg
-			;ldq FP_A ; Q should already contain correct value
-			clc
+			MATH_MOV leftSpanX, MULTINA
+			MATH_MUL_APOS_DIRECT totalSlopeX
+			;clc
 			adcq leftY
 			cmpq midY
 			bmi plg_inverse
-plg_noninverse:
+plg_noninverse: ; longest slope running at bottom
 			lda #>slopebottom
-			sta pdlbot+2
+			sta pdllong+1
 			lda #>slopetop
-			sta pdltop1+2
-			sta pdltop2+2
+			sta pdlshort+1
 			bra plg_checkend
-plg_inverse:		
+plg_inverse: ; longest slope running at top		
 			lda #>slopetop
-			sta pdlbot+2
+			sta pdllong+1
 			lda #>slopebottom
-			sta pdltop1+2
-			sta pdltop2+2		
+			sta pdlshort+1
 plg_checkend
+
+			; ----------------------------------------------- DMA plot Y spans
+
+pdlshort:	lda #>slopetop
+			sta dma_slpdadr+1
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftY,  leftSpanX,  leftSpanY,  leftSlopeX, #0				; partial span left
+			GENERATE_SLOPE_TABLE_NONCLIPPED  midY, rightSpanX, rightSpanY, rightSlopeX, leftSpanX+2		; partial span right
+pdllong:	lda #>slopebottom
+			sta dma_slpdadr+1
+			GENERATE_SLOPE_TABLE_NONCLIPPED leftY, totalSpanX, totalSpanY, totalSlopeX, #0				; total span
 
 		; ----------------------------------------------- set up polygon
 
@@ -231,15 +232,15 @@ polygon_draw_loop2:
 polygon_continue_draw:
 
 			sec
-pdlbot:		lda $ff00,y										; get bottom y
-pdltop1:	sbc $ff00,y										; subtract top y to get span size
+			lda slopebottom,y								; get bottom y
+			sbc slopetop,y									; subtract top y to get span size
 			bcs pdlpos										; continue if positive
 			bra pdl3										; otherwise skip span
 pdlpos:		beq pdl3										; continue if not 0
 pdl2:		sta linesize+0
 
 			clc
-pdltop2:	lda $ff00,y										; get top again
+			lda slopetop,y									; get top again
 			sta MULTINB+0									; and multiply by 8 to get to correct column
 			lda MULTOUT+0 ; times8lo,y
 			adc dstcolumnlo,y

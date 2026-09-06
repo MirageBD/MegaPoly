@@ -1115,7 +1115,7 @@ frame			.byte 0
 angle			.word 0
 screenrow		.byte 0
 screencolumn	.byte 0
-vertindex		.byte 0
+vertindex		.byte 0			; currently can't be more than 64!
 polyindex		.byte 0
 pihi			.byte 0
 rrbxpos			.byte 0
