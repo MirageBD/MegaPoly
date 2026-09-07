@@ -50,13 +50,17 @@ rploop
 			MATH_MOV DIVOUTWHOLE+2, MULTINA					; add 2 to get new 16.16 fixed point result
 
 			MATH_MUL_APOS_DIRECT sx							; perspective divide
-			adcq q100										; and move to center of screen
+			clc
+			tya
+			adc #100										; and move to center of screen
 			ldx vertindex
-			sty vertsxconv,x
+			sta vertsxconv,x
 			MATH_MUL_APOS_DIRECT sy
-			adcq q100
+			clc
+			tya
+			adc #100										; and move to center of screen
 			ldx vertindex
-			sty vertsyconv,x
+			sta vertsyconv,x
 
 			clc
 			lda vxptr+0
