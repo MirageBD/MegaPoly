@@ -12,18 +12,15 @@ transformvertices:
 
 			; ---------------------------- INIT TRANSFORM VERTICES
 
-			lda #<vertsx
+			lda #$00
 			sta vxptr+0
+			sta vyptr+0
+			sta vzptr+0
+
 			lda #>vertsx
 			sta vxptr+1
-
-			lda #<vertsy
-			sta vyptr+0
 			lda #>vertsy
 			sta vyptr+1
-
-			lda #<vertsz
-			sta vzptr+0
 			lda #>vertsz
 			sta vzptr+1
 
@@ -86,13 +83,12 @@ drawpolygons:
 
 			; ---------------------------- INIT DRAW POLYGONS
 
-			lda #<vertsxconv								; set pointers to transformed vertices
+			lda #$00								; set pointers to transformed vertices
 			sta vxcptr+0
+			sta vycptr+0
+
 			lda #>vertsxconv
 			sta vxcptr+1
-
-			lda #<vertsyconv
-			sta vycptr+0
 			lda #>vertsyconv
 			sta vycptr+1
 
@@ -153,21 +149,18 @@ not_backface_culled:
 			sta vyptr+0
 			sta vzptr+0
 			lda times4hi,x
-			sta pihi
+			tax
 
 			clc												; add normals addresses. needs to be page aligned
-			lda #>normalsx
-			adc pihi
+			adc #>normalsx
 			sta vxptr+1
 
-			;clc
-			lda #>normalsy
-			adc pihi
+			txa
+			adc #>normalsy
 			sta vyptr+1
 
-			;clc
-			lda #>normalsz
-			adc pihi
+			txa
+			adc #>normalsz
 			sta vzptr+1
 
 			ldz #$00
@@ -191,7 +184,7 @@ not_backface_culled:
 			ldq sx
 			stq MULTINA
 			MATH_MUL_APOS lightvec+0, t1
-			clc
+			;clc
 			adcq t2
 			adcq t3
 			stq MULTINA
