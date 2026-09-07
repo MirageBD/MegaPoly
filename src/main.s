@@ -201,21 +201,27 @@ entry_main
 			DMA_RUN_JOB clearpartialbitmapjob2
 
 			; pal y border start
-			lda #<104
+			lda #<100
 			sta verticalcenter+0
-			lda #>104
+			lda #>100
 			sta verticalcenter+1
+
+			; force NTSC mode
+			;lda $d06f
+			;ora #%10000000
+			;sta $d06f
 
 			bit $d06f
 			bpl pal
 
-ntsc		lda #<55
+ntsc		lda #<32
 			sta verticalcenter+0
-			lda #>55
+			lda #>32
 			sta verticalcenter+1
 
 pal			lda verticalcenter+0
-			sta $d048
+			sta $d048 ; VIC4.TBDRPOSLSB
+			sta $d04e ; VIC4.TEXTYPOSLSB
 			lda #%00001111
 			trb $d049
 			lda verticalcenter+1
@@ -230,7 +236,7 @@ pal			lda verticalcenter+0
 			lda #>.hiword(screen1)
 			sta $d063
 
-			; ----------------------------------------------- SET UP SCREEN 1
+			; ----------------------------------------------- SET UP SCREEN 1 (background page 1)
 
 			lda #$00
 			sta screenrow
@@ -293,7 +299,7 @@ put11		sty screen1+1
 
 endscreenplot1
 
-			; ----------------------------------------------- SET UP SCREEN 2
+			; ----------------------------------------------- SET UP SCREEN 2 (background page 2)
 
 			lda #$00
 			sta screenrow
@@ -356,7 +362,7 @@ put21		sty screen2+1
 
 endscreenplot2
 
-			; ----------------------------------------------- SET UP SCREEN 3
+			; ----------------------------------------------- SET UP SCREEN 3 (overlay page 1)
 
 			lda #$00
 			sta screenrow
@@ -418,7 +424,7 @@ put31		sty screen1+40*2+3
 			jmp put30
 
 endscreenplot3
-			; ----------------------------------------------- SET UP SCREEN 4
+			; ----------------------------------------------- SET UP SCREEN 4 (overlay page 2)
 
 			lda #$00
 			sta screenrow

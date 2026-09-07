@@ -63,7 +63,13 @@ slope_negative:		lda #%00010000									; negative DMA copy
 					sta dma_slpsskiphi+1
 					;jmp span_finalise
 
-span_finalise:		jsr dma_plot_slope
+span_finalise:		;lda #>lineartable
+					;sta dma_slpsadr+1
+					;lda #>slopetop
+					;sta dma_slpdadr+1
+					jsr dma_plot_slope
+
+					
 span_skip:
 .endscope
 .endmacro
@@ -111,12 +117,6 @@ dma_hgtdadr:		.word slopeheights						; dst
 ; ----------------------------------------------------------------------------------------------------
 
 rasterizepoly:
-
-			lda linecolour
-			lsr
-			clc
-			adc #$c0
-			sta $d020
 
 			; ----------------------------------------------- swap points if needed, sorting points from left to right
 

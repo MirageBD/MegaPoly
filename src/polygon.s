@@ -28,7 +28,7 @@ transformvertices:
 
 			lda #$00
 			sta vertindex
-rploop
+tvloop
 			ldz #0
 			ldq (vxptr),z
 			stq fx
@@ -48,7 +48,7 @@ rploop
 			sbcq sz
 			stq MULTINB
 
-			MATH_MOV DIVOUTWHOLE+2, MULTINA					; add 2 to get new 16.16 fixed point result
+			MATH_MOV DIVOUTWHOLE+2, MULTINA					; take division result (=1/z) and put it back in multiplier
 
 			MATH_MUL_APOS_DIRECT sx							; perspective divide
 			clc
@@ -78,7 +78,7 @@ rploop
 			lda vertindex
 			cmp #numverts
 			beq :+
-			jmp rploop
+			jmp tvloop
 :
 			rts
 
@@ -101,6 +101,9 @@ drawpolygons:
 
 			ldx #$00
 dploop		stx polyindex
+
+			lda #$00
+			sta $d020
 
 			ldz indicesp1,x
 			lda (vxcptr),z
@@ -154,18 +157,13 @@ not_backface_culled:
 			sta vyptr+0
 			sta vzptr+0
 			lda times4hi,x
-			tax
 
 			clc												; add normals addresses. needs to be page aligned
 			adc #>normalsx
 			sta vxptr+1
-
-			txa
-			adc #>normalsy
+			adc #>(normalsy-normalsx)
 			sta vyptr+1
-
-			txa
-			adc #>normalsz
+			adc #>(normalsz-normalsy)
 			sta vzptr+1
 
 			ldz #$00
@@ -205,6 +203,11 @@ not_backface_culled:
 			clc
 			adc colorremap,y
 			sta linecolour
+
+			lsr
+			clc
+			adc #$c0
+			sta $d020
 
 			jsr rasterizepoly
 			;lda #0
