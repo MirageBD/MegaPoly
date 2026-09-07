@@ -278,33 +278,37 @@ plg_checkend
 
 polygon_setup:
 
-			ldq q0											; get ready to multiply stuff by 8 in inner loop
+			lda #0											; get ready to multiply stuff by 8 in inner loop
+			tax
+			tay
+			taz
 			stq MULTINA
 			stq MULTINB
+
 			lda #8
 			sta MULTINA+0
+
+			ldx leftX+2										; set all variabe low bytes
 
 			; ----------------------------------------------- do the actual polygon drawing loop.
 
 polygon_draw_loop:
 
-			ldy leftX+2										; set all variabe low bytes
-
-polygon_draw_loop2:
-
-			cpy rightX+2
+			cpx rightX+2
 			beq polygon_end_draw
 
-			lda slopeheights,y
+			lda slopeheights,x
 			sta linesize+0
-			clc
-			lda slopetop,y									; get top again
-			sta MULTINB+0									; and multiply by 8 to get to correct column
-			lda MULTOUT+0 ; times8lo,y
-			adc dstcolumnlo,y
+
+			lda slopetop,x									; get top again
+			sta MULTINB+0									; and multiply by 8 to get to correct row
+
+			lda MULTOUT+0 ; times8lo,x						; then add address for this column
+			adc dstcolumnlo,x
 			sta linestart+0
-			lda MULTOUT+1 ; times8hi,y
-			adc dstcolumnhi,y
+
+			lda MULTOUT+1 ; times8hi,x
+			adc dstcolumnhi,x
 			sta linestart+1
 
 drawspan:		sta $d707									; inline DMA
@@ -319,8 +323,8 @@ linebuf			.byte ((screenchars1 >> 16) & $0f)			; dst bank and flags
 				.byte $00									; cmd hi
 				.word $0000									; modulo, ignored
 
-pdl3:		iny												; increase everything to get to next pixel/column
-			bra polygon_draw_loop2	; if we've crossed the 256 (when the screen is 320 wide, which it's not) boundary then increase columnhi and stuff
+			inx
+			bra polygon_draw_loop
 
 polygon_end_draw:
 
