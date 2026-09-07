@@ -144,8 +144,8 @@ entry_main
 			jsr fl_waiting
 			FLOPPY_IFFL_FAST_LOAD_INIT "MEGAPLY.IFFLCRCH"
 			FLOPPY_IFFL_FAST_LOAD_ADDRESS $00010000
-			FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000ca00
-			FLOPPY_IFFL_FAST_LOAD_ADDRESS $0000cd00
+			FLOPPY_IFFL_FAST_LOAD_ADDRESS palette
+			FLOPPY_IFFL_FAST_LOAD_ADDRESS altpalette
 			FLOPPY_IFFL_FAST_LOAD_ADDRESS $00040000
 
 			jsr fl_exit
@@ -1086,7 +1086,7 @@ slopetop
 		.byte 0
 .endrepeat
 
-slopebottom
+slopeheights
 .repeat 256
 		.byte 0
 .endrepeat
