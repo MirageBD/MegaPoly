@@ -1126,14 +1126,12 @@ verticalcenter	.word 0
 
 q0				.byte $00, $00, $00, $00
 q32				.byte $00, $00, $20, $00
-q80				.byte $00, $00, $c0, $00
-q100			.byte $00, $00, $60, $00
-q128			.byte $00, $00, $80, $00
+q192			.byte $00, $00, $c0, $00
 
 qlightadd		.byte $00, $00, $10, $00
 qlightmult		.byte $00, $00, $2e, $00
 
-qdistance		.byte $00, $00, $08, $00
+qdistance		.byte $00, $00, $00, $00
 
 lightvec		.byte $00, $80, $ff, $ff,    $00, $00, $00 ,$00,    $00, $e0, $00, $00
 

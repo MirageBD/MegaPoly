@@ -77,7 +77,7 @@
 		tax
 		tay
 		taz
-		sec
+		;sec
 		sbcq from
 .endmacro
 
@@ -136,12 +136,7 @@ end:
 						bit opB+3
 						bpl posresult
 negresult:				MATH_NEG opB, MULTINB			; a is positive, b is negative - use negative result
-						lda #0
-						tax
-						tay
-						taz
-						;sec
-						sbcq MULTOUT+2
+						MATH_NEG_DIRECT MULTOUT+2
 						bra end
 posresult:				MATH_MOV opB, MULTINB			; a is positive, b is positive - use positive result
 						ldq MULTOUT+2
@@ -158,6 +153,19 @@ end:
 						bra end
 negresult:				MATH_MOV opB, MULTINB			; a is negative, b is positive - use negative result
 						MATH_NEG MULTOUT+2, result
+end:
+.endscope
+.endmacro
+
+.macro MATH_MUL_ANEG_DIRECT opB
+.scope
+						bit opB+3
+						bpl negresult
+						MATH_NEG opB, MULTINB			; a is negative, b is negative - use positive result
+						ldq MULTOUT+2
+						bra end
+negresult:				MATH_MOV opB, MULTINB			; a is negative, b is positive - use negative result
+						MATH_NEG_DIRECT MULTOUT+2
 end:
 .endscope
 .endmacro
@@ -197,32 +205,35 @@ pzmult:
 						bmi negpz
 						jmp pospz
 negpz:					MATH_NEG pz, MULTINA
-						MATH_MUL_ANEG mat+2*4, matrix4x4_TEMP+6*4
-						MATH_MUL_ANEG mat+5*4, matrix4x4_TEMP+7*4
-						MATH_MUL_ANEG mat+8*4, matrix4x4_TEMP+8*4
+						MATH_MUL_ANEG_DIRECT mat+2*4 ; , matrix4x4_TEMP+6*4
+						adcq matrix4x4_TEMP+3*4
+						adcq matrix4x4_TEMP+0*4
+						stq pox
+						MATH_MUL_ANEG_DIRECT mat+5*4 ; , matrix4x4_TEMP+7*4
+						adcq matrix4x4_TEMP+4*4
+						adcq matrix4x4_TEMP+1*4
+						stq poy
+						MATH_MUL_ANEG_DIRECT mat+8*4 ; , matrix4x4_TEMP+8*4
+						adcq matrix4x4_TEMP+5*4
+						adcq matrix4x4_TEMP+2*4
+						stq poz
 						jmp muldone
 pospz:					MATH_MOV pz, MULTINA
-						MATH_MUL_APOS mat+2*4, matrix4x4_TEMP+6*4
-						MATH_MUL_APOS mat+5*4, matrix4x4_TEMP+7*4
-						MATH_MUL_APOS mat+8*4, matrix4x4_TEMP+8*4
-
-muldone:				;clc
-						ldq  matrix4x4_TEMP+0*4
+						MATH_MUL_APOS_DIRECT mat+2*4 ; , matrix4x4_TEMP+6*4
 						adcq matrix4x4_TEMP+3*4
-						adcq matrix4x4_TEMP+6*4
+						adcq matrix4x4_TEMP+0*4
 						stq pox
-
-						;clc
-						ldq  matrix4x4_TEMP+1*4
+						MATH_MUL_APOS_DIRECT mat+5*4 ; , matrix4x4_TEMP+7*4
 						adcq matrix4x4_TEMP+4*4
-						adcq matrix4x4_TEMP+7*4
+						adcq matrix4x4_TEMP+1*4
 						stq poy
-
-						;clc
-						ldq  matrix4x4_TEMP+2*4
+						MATH_MUL_APOS_DIRECT mat+8*4 ; , matrix4x4_TEMP+8*4
 						adcq matrix4x4_TEMP+5*4
-						adcq matrix4x4_TEMP+8*4
+						adcq matrix4x4_TEMP+2*4
 						stq poz
+
+muldone:
+
 .endscope
 .endmacro
 

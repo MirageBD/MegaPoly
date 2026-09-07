@@ -315,7 +315,7 @@ drawspan:		sta $d707									; inline DMA
 				.byte $85, 8								; Destination skip rate (whole bytes)
 				.byte $00									; No more options
 				.byte %00000011								; fill and last request
-linesize:		.word $0004									; count - needs initialising
+linesize:		.word $0000									; count - needs initialising
 linecolour:		.word $00b0									; src - this is normally the source addres, but contains the fill value now
 				.byte $00									; src bank and flags (ignored)
 linestart		.word (screenchars1 & $ffff)				; dst

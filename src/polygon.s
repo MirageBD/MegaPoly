@@ -41,12 +41,13 @@ rploop
 
 			MATH_MUL_VEC3_MAT3x3 fx, fy, fz, m11, sx, sy, sz
 			
+			MATH_MOV q192, MULTINA							; multiply by factor
+
 			;sec
 			ldq qdistance                                   ; take distance, sub z
 			sbcq sz
 			stq MULTINB
 
-			MATH_MOV q80, MULTINA							; multiply by factor
 			MATH_MOV DIVOUTWHOLE+2, MULTINA					; add 2 to get new 16.16 fixed point result
 
 			MATH_MUL_APOS_DIRECT sx							; perspective divide
@@ -119,25 +120,25 @@ dploop		stx polyindex
 			lda (vycptr),z
 			sta rightY+2
 
-			ldq midX										; calculate winding order
+			ldq  midX										; calculate winding order
 			sbcq leftX
-			stq MULTINA
-			ldq rightY
+			stq  MULTINA
+			ldq  rightY
 			sbcq midY
-			stq MULTINB
+			stq  MULTINB
 
 			MATH_MOV MULTOUT+2, t1
 
-			ldq midY
+			ldq  midY
 			sbcq leftY
-			stq MULTINA
-			ldq rightX
+			stq  MULTINA
+			ldq  rightX
 			sbcq midX
-			stq MULTINB
+			stq  MULTINB
 
-			ldq MULTOUT+2
+			ldq  MULTOUT+2
 			sbcq t1
-			stq t1
+			stq  t1
 
 			bit t1+3										; backface cull
 			bmi not_backface_culled
